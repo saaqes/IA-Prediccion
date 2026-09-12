@@ -188,6 +188,9 @@ p { margin: 0; }
 }
 .select:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 
+.select--sm { min-width: 180px; font-size: 0.8rem; padding-top: 6px; padding-bottom: 6px; }
+.field + .field { margin-top: 8px; }
+
 .market-name { margin-top: 8px; font-size: 0.8rem; color: var(--ink-dim); }
 
 .price { text-align: right; display: grid; gap: 3px; }
@@ -673,6 +676,13 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       <div class="market-head">
         <div>
           <label class="field">
+            <span class="field__label">Fuente de datos</span>
+            <select id="sourceSelect" class="select select--sm">
+              <option value="deriv">Deriv · índices de volatilidad</option>
+              <option value="binance">Binance · cripto en vivo</option>
+            </select>
+          </label>
+          <label class="field">
             <span class="field__label">Mercado</span>
             <select id="marketSelect" class="select"></select>
           </label>
@@ -844,7 +854,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '1.6.0';
+TAI.VERSION = '1.7.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -1361,6 +1371,233 @@ TAI.getSymbol = function (code) {
   TAI.connectMarketAPI = function () { TAI.MarketAPI.connect(); };
   TAI.subscribeMarket = function (symbol) { TAI.MarketAPI.subscribe(symbol); };
   TAI.getMarketData = function () { return TAI.MarketAPI.getMarketData(); };
+})(window.TAI);
+
+/* ==== js/market-binance.js ==== */
+/**
+ * market-binance.js
+ * Fuente de datos alternativa, pública y sin credenciales.
+ *
+ * Se usa cuando Deriv no devuelve mercados para el app_id configurado.
+ * Expone EXACTAMENTE la misma interfaz que TAI.MarketAPI, así que el resto
+ * de la aplicación (gráfico, tabla, motor de análisis, IA) no cambia nada.
+ *
+ * Datos reales: klines de 1 segundo para el historial y stream de operaciones
+ * en vivo por WebSocket. Nunca se generan precios.
+ */
+(function (TAI) {
+  'use strict';
+
+  var PARES = [
+    { code: 'BTCUSDT', label: 'Bitcoin / USDT', decimals: 2 },
+    { code: 'ETHUSDT', label: 'Ethereum / USDT', decimals: 2 },
+    { code: 'SOLUSDT', label: 'Solana / USDT', decimals: 3 },
+    { code: 'BNBUSDT', label: 'BNB / USDT', decimals: 2 },
+    { code: 'XRPUSDT', label: 'XRP / USDT', decimals: 4 },
+    { code: 'DOGEUSDT', label: 'Dogecoin / USDT', decimals: 5 },
+    { code: 'ADAUSDT', label: 'Cardano / USDT', decimals: 4 },
+    { code: 'LINKUSDT', label: 'Chainlink / USDT', decimals: 3 }
+  ];
+
+  var REST = 'https://api.binance.com/api/v3/klines';
+  var WS = 'wss://stream.binance.com:9443/stream?streams=';
+
+  function Emitter() { this._handlers = {}; }
+  Emitter.prototype.on = function (evt, cb) {
+    (this._handlers[evt] = this._handlers[evt] || []).push(cb);
+    return this;
+  };
+  Emitter.prototype.emit = function (evt, payload) {
+    (this._handlers[evt] || []).forEach(function (cb) {
+      try { cb(payload); } catch (e) { console.error('[Binance]', evt, e); }
+    });
+  };
+
+  function BinanceAPI() {
+    Emitter.call(this);
+    this.socket = null;
+    this.state = 'disconnected';
+    this.symbol = null;
+    this.ticks = [];
+    this.watch = {};
+    this.symbolsReady = false;
+    this.manualClose = false;
+    this.lastError = null;
+    this.currentEndpoint = 'Binance';
+  }
+  BinanceAPI.prototype = Object.create(Emitter.prototype);
+  BinanceAPI.prototype.constructor = BinanceAPI;
+
+  BinanceAPI.prototype._setState = function (state, message) {
+    this.state = state;
+    this.emit('status', { state: state, message: message || '' });
+  };
+
+  BinanceAPI.prototype.isConnected = function () {
+    return !!this.socket && this.socket.readyState === WebSocket.OPEN;
+  };
+
+  BinanceAPI.prototype.connect = function () {
+    if (this.socket && this.socket.readyState <= 1) return;
+    this.manualClose = false;
+    this._setState('connecting', 'Conectando con los datos del mercado…');
+
+    // La lista de mercados es fija y conocida: no hace falta descubrirla
+    TAI.CONFIG.MARKET.symbols = PARES.map(function (p) {
+      return { code: p.code, label: p.label, index: 0, oneSecond: false, decimals: p.decimals };
+    });
+    this.symbolsReady = true;
+    this.emit('symbols', { symbols: TAI.CONFIG.MARKET.symbols });
+
+    PARES.forEach(function (p) { this.watch[p.code] = { ticks: [] }; }, this);
+
+    var streams = PARES.map(function (p) { return p.code.toLowerCase() + '@trade'; }).join('/');
+    var self = this;
+
+    try {
+      this.socket = new WebSocket(WS + streams);
+    } catch (err) {
+      this._setState('error', 'No puedo acceder a los datos del mercado en este momento.');
+      return;
+    }
+
+    this.socket.onopen = function () {
+      self._setState('connected', 'Datos de mercado conectados (Binance).');
+      var target = self.symbol || PARES[0].code;
+      delete self.watch[target];
+      self.subscribe(target, true);
+      PARES.forEach(function (p) {
+        if (p.code !== target) self._loadHistory(p.code, 60, true);
+      });
+    };
+
+    this.socket.onmessage = function (event) {
+      var msg;
+      try { msg = JSON.parse(event.data); } catch (e) { return; }
+      var d = msg.data || msg;
+      if (!d || !d.s || !d.p) return;
+
+      var tick = { time: Math.floor(Number(d.T) / 1000), price: Number(d.p) };
+      if (!isFinite(tick.price)) return;
+
+      if (d.s === self.symbol) {
+        var last = self.ticks[self.ticks.length - 1];
+        if (last && last.time === tick.time) self.ticks[self.ticks.length - 1] = tick;
+        else self.ticks.push(tick);
+        if (self.ticks.length > 600) self.ticks = self.ticks.slice(-300);
+        self.emit('tick', { symbol: d.s, tick: tick, ticks: self.ticks });
+        return;
+      }
+
+      var w = self.watch[d.s];
+      if (!w) return;
+      var lw = w.ticks[w.ticks.length - 1];
+      if (lw && lw.time === tick.time) w.ticks[w.ticks.length - 1] = tick;
+      else w.ticks.push(tick);
+      if (w.ticks.length > 120) w.ticks = w.ticks.slice(-60);
+      self.emit('watch', { symbol: d.s });
+    };
+
+    this.socket.onerror = function () {
+      self.lastError = 'Fallo de red con Binance';
+      self._setState('error', 'No puedo acceder a los datos del mercado en este momento.');
+    };
+
+    this.socket.onclose = function () {
+      if (self.manualClose) { self._setState('disconnected', 'Conexión cerrada.'); return; }
+      self._setState('disconnected', 'Sin conexión con los datos del mercado.');
+      setTimeout(function () { self.connect(); }, 3000);
+    };
+  };
+
+  /** Historial real por REST: velas de 1 segundo, se usa el cierre de cada una. */
+  BinanceAPI.prototype._loadHistory = function (symbol, limit, esWatch) {
+    var self = this;
+    var url = REST + '?symbol=' + symbol + '&interval=1s&limit=' + (limit || 300);
+
+    return fetch(url)
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (rows) {
+        var ticks = rows.map(function (k) {
+          return { time: Math.floor(Number(k[0]) / 1000), price: Number(k[4]) };
+        }).filter(function (t) { return isFinite(t.price); });
+
+        if (esWatch) {
+          if (!self.watch[symbol]) self.watch[symbol] = { ticks: [] };
+          self.watch[symbol].ticks = ticks;
+          self.emit('watch', { symbol: symbol });
+          return;
+        }
+
+        if (symbol !== self.symbol) return;
+        self.ticks = ticks;
+        self.emit('history', { symbol: symbol, ticks: ticks.slice() });
+      })
+      .catch(function (err) {
+        console.warn('[Binance] historial', symbol, err.message);
+        if (!esWatch) self.emit('error', { message: 'No pude cargar el historial del mercado.', code: 'history' });
+      });
+  };
+
+  BinanceAPI.prototype.subscribe = function (symbol, force) {
+    if (!force && symbol === this.symbol) return;
+    if (!TAI.getSymbol(symbol)) return;
+
+    if (this.symbol && this.symbol !== symbol) this.watch[this.symbol] = { ticks: [] };
+    delete this.watch[symbol];
+
+    this.symbol = symbol;
+    this.ticks = [];
+    this.emit('history', { symbol: symbol, ticks: [] });
+    this._loadHistory(symbol, 300, false);
+  };
+
+  BinanceAPI.prototype.subscribeWatchlist = function () { /* el stream ya trae todos los pares */ };
+
+  BinanceAPI.prototype.getWatchRow = function (symbol) {
+    var ticks = symbol === this.symbol ? this.ticks : (this.watch[symbol] ? this.watch[symbol].ticks : []);
+    if (!ticks.length) return { symbol: symbol, last: null, changePct: null, count: 0 };
+    var last = ticks[ticks.length - 1].price;
+    var ref = ticks[Math.max(0, ticks.length - 60)].price;
+    return {
+      symbol: symbol,
+      last: last,
+      changePct: ref ? (last - ref) / ref * 100 : null,
+      count: ticks.length,
+      active: symbol === this.symbol
+    };
+  };
+
+  BinanceAPI.prototype.getMarketData = function () {
+    return {
+      symbol: this.symbol,
+      connected: this.isConnected(),
+      ticks: this.ticks.slice(),
+      lastPrice: this.ticks.length ? this.ticks[this.ticks.length - 1].price : null,
+      updatedAt: this.ticks.length ? this.ticks[this.ticks.length - 1].time : null
+    };
+  };
+
+  BinanceAPI.prototype.hasEnoughData = function () {
+    return this.ticks.length >= TAI.CONFIG.MARKET.minTicksForAnalysis;
+  };
+
+  BinanceAPI.prototype.reconnectNow = function () {
+    this.manualClose = false;
+    if (this.socket) { try { this.socket.close(); } catch (e) { /* noop */ } }
+    this.socket = null;
+    this.connect();
+  };
+
+  BinanceAPI.prototype.disconnect = function () {
+    this.manualClose = true;
+    if (this.socket) { try { this.socket.close(); } catch (e) { /* noop */ } }
+  };
+
+  TAI.BinanceAPI = new BinanceAPI();
 })(window.TAI);
 
 /* ==== js/analysis-engine.js ==== */
@@ -2794,7 +3031,7 @@ TAI.getSymbol = function (code) {
   function cacheElements() {
     [
       'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus',
-      'marketSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
+      'marketSelect', 'sourceSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
       'mdLast', 'mdHigh', 'mdLow', 'mdRange', 'mdVol', 'mdTrend', 'mdCount', 'mdInterval',
       'feedText', 'reconnectBtn', 'watchBody', 'tvWidget', 'appVersion',
       'conversation', 'interim', 'micBtn', 'micState', 'micHint', 'waves',
@@ -2832,6 +3069,16 @@ TAI.getSymbol = function (code) {
   function fillMarketSelect(symbols, current) {
     if (!el.marketSelect) return;
     el.marketSelect.innerHTML = '';
+
+    if (!symbols || !symbols.length) {
+      var vacio = document.createElement('option');
+      vacio.textContent = 'Sin mercados disponibles';
+      vacio.disabled = true;
+      vacio.selected = true;
+      el.marketSelect.appendChild(vacio);
+      return;
+    }
+
     symbols.forEach(function (s) {
       var opt = document.createElement('option');
       opt.value = s.code;
@@ -3187,7 +3434,7 @@ TAI.getSymbol = function (code) {
   var CFG = TAI.CONFIG;
   var UI = TAI.UI;
   var Voice = TAI.Voice;
-  var Market = TAI.MarketAPI;
+  var Market = TAI.MarketAPI;      // proveedor activo; se puede cambiar en caliente
 
   var state = {
     symbol: CFG.MARKET.defaultSymbol,
@@ -3200,6 +3447,7 @@ TAI.getSymbol = function (code) {
     busySince: 0,
     autoBriefDone: false,
     lastTickAt: 0,
+    provider: 'deriv',
     lastLiveRefresh: 0,
     silenceStreak: 0,    // turnos seguidos sin escuchar nada
     greeted: false
@@ -3235,6 +3483,7 @@ TAI.getSymbol = function (code) {
     bindMarket();
 
     Market.connect();
+    watchProviderHealth();
 
     greet();
   }
@@ -3298,6 +3547,10 @@ TAI.getSymbol = function (code) {
 
     UI.el.marketSelect.addEventListener('change', function (e) {
       switchMarket(e.target.value, true);
+    });
+
+    UI.el.sourceSelect.addEventListener('change', function (e) {
+      useProvider(e.target.value);
     });
 
     UI.el.reconnectBtn.addEventListener('click', function () {
@@ -3390,7 +3643,45 @@ TAI.getSymbol = function (code) {
 
   /* ------------------------------ mercado ------------------------------ */
 
+  /**
+   * Cambia la fuente de datos sin recargar la página.
+   * @param {string} name 'deriv' | 'binance'
+   */
+  function useProvider(name, motivo) {
+    var siguiente = name === 'binance' ? TAI.BinanceAPI : TAI.MarketAPI;
+    if (siguiente === Market && Market.isConnected()) return;
+
+    try { Market.disconnect(); } catch (e) { /* noop */ }
+
+    Market = siguiente;
+    state.provider = name;
+    state.autoBriefDone = false;
+    state.lastTickAt = 0;
+    state.chart.setData([], 3);
+    UI.setChartOverlay('Conectando con ' + (name === 'binance' ? 'Binance' : 'Deriv') + '…');
+    if (UI.el.sourceSelect && UI.el.sourceSelect.value !== name) UI.el.sourceSelect.value = name;
+
+    bindMarket();
+    Market.connect();
+
+    if (motivo) {
+      UI.toast(motivo);
+      UI.addMessage('ai', motivo);
+    }
+  }
+
+  /** Si Deriv no entrega mercados, se pasa solo a la fuente alternativa. */
+  function watchProviderHealth() {
+    setTimeout(function () {
+      if (state.provider !== 'deriv') return;
+      if (Market.ticks && Market.ticks.length) return;
+      useProvider('binance', 'Deriv no entregó mercados con este app_id, así que cambié a Binance: datos reales en vivo y el análisis funciona igual. Puedes volver a Deriv en el selector de fuente.');
+    }, 12000);
+  }
+
   function bindMarket() {
+    if (Market._bound) return;         // evita registrar dos veces los mismos handlers
+    Market._bound = true;
     Market.on('status', function (s) {
       UI.setStatus('api', s.state);
       if (s.state === 'connecting') UI.setChartOverlay('Conectando con el mercado…');
@@ -3429,7 +3720,13 @@ TAI.getSymbol = function (code) {
 
     Market.on('watch', function () { refreshWatchlist(); });
 
-    Market.on('error', function (p) { UI.toast(p.message); });
+    Market.on('error', function (p) {
+      if ((p.code === 'NoSymbolList' || p.code === 'NoSymbols') && state.provider === 'deriv') {
+        useProvider('binance', 'Deriv no devolvió mercados disponibles. Cambio a Binance para seguir con datos reales.');
+        return;
+      }
+      UI.toast(p.message);
+    });
   }
 
   /**
