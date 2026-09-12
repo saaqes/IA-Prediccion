@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <meta name="theme-color" content="#05080f">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="description" content="Trading AI — asistente de voz para análisis y predicción de índices de volatilidad.">
@@ -961,6 +962,9 @@ TAI.getSymbol = function (code) {
     this.manualClose = false;
     this._pendingSymbol = null;
     this.watch = {};                 // { symbol: { ticks:[], subId } } resto de mercados
+    this.symbolsReady = false;
+    this._wantedSymbol = null;
+    this._symbolsTimer = null;
     this._endpointIndex = 0;
     this._pingTimer = null;
     this.lastError = null;
@@ -1006,11 +1010,17 @@ TAI.getSymbol = function (code) {
       self.lastError = null;
       self._startPing();
       self._setState('connected', 'Datos de mercado conectados (' + base + ').');
-      var target = self._pendingSymbol || self.symbol || TAI.CONFIG.MARKET.defaultSymbol;
-      self._pendingSymbol = null;
       self.watch = {};
-      self.subscribe(target, true);
-      self.subscribeWatchlist();
+      self._wantedSymbol = self._pendingSymbol || self.symbol || TAI.CONFIG.MARKET.defaultSymbol;
+      self._pendingSymbol = null;
+
+      // Los códigos de símbolo dependen del app_id y de la región: se preguntan,
+      // nunca se asumen. Así no aparecen errores InvalidSymbol.
+      self._send({ active_symbols: 'brief', product_type: 'basic' });
+
+      self._symbolsTimer = setTimeout(function () {
+        if (!self.symbolsReady) self._startStreams();     // respaldo si no responde
+      }, 6000);
     };
 
     this.socket.onmessage = function (event) {
@@ -1118,6 +1128,59 @@ TAI.getSymbol = function (code) {
    * Suscribe el resto de índices con un historial corto, solo para la tabla.
    * El mercado activo se excluye: Deriv rechaza dos suscripciones al mismo símbolo.
    */
+  /** Arranca el stream del mercado activo y la tabla, ya con símbolos validados. */
+  MarketAPI.prototype._startStreams = function () {
+    var list = TAI.CONFIG.MARKET.symbols;
+    var wanted = this._wantedSymbol;
+    var exists = list.some(function (s) { return s.code === wanted; });
+    var target = exists ? wanted : (list[0] && list[0].code);
+    if (!target) {
+      this._setState('error', 'El proveedor no expone mercados disponibles para esta aplicación.');
+      return;
+    }
+    this._wantedSymbol = null;
+    this.subscribe(target, true);
+    this.subscribeWatchlist();
+  };
+
+  /**
+   * Convierte la respuesta active_symbols en la lista de mercados de la app.
+   * Se queda con los índices de volatilidad; si la región no los ofrece,
+   * usa los sintéticos disponibles y, en último caso, los primeros mercados abiertos.
+   */
+  MarketAPI.prototype._loadSymbols = function (rows) {
+    var abiertos = (rows || []).filter(function (r) { return r.exchange_is_open !== 0; });
+
+    var volatilidad = abiertos.filter(function (r) {
+      return /volatility/i.test(r.display_name || '');
+    });
+    var sinteticos = abiertos.filter(function (r) {
+      return r.market === 'synthetic_index' || /synthetic/i.test(r.market_display_name || '');
+    });
+
+    var elegidos = volatilidad.length ? volatilidad : (sinteticos.length ? sinteticos : abiertos);
+    elegidos = elegidos.slice(0, 12);
+
+    if (!elegidos.length) return false;
+
+    TAI.CONFIG.MARKET.symbols = elegidos.map(function (r) {
+      var nombre = (r.display_name || r.symbol).replace(/\s*Index$/i, '').trim();
+      var num = nombre.match(/(\d+)/);
+      var pip = Number(r.pip) || 0.001;
+      return {
+        code: r.symbol,
+        label: nombre,
+        index: num ? Number(num[1]) : 0,
+        oneSecond: /\(1s\)|1hz/i.test(nombre + ' ' + r.symbol),
+        decimals: Math.max(0, Math.min(8, Math.round(-Math.log(pip) / Math.LN10)))
+      };
+    });
+
+    this.symbolsReady = true;
+    this.emit('symbols', { symbols: TAI.CONFIG.MARKET.symbols });
+    return true;
+  };
+
   MarketAPI.prototype.subscribeWatchlist = function () {
     var self = this;
     if (!this.isConnected()) return;
@@ -1165,9 +1228,28 @@ TAI.getSymbol = function (code) {
 
     if (data.error) {
       this.lastError = (data.error.code || '') + ' ' + (data.error.message || '');
+      var pedido = data.echo_req && data.echo_req.ticks_history;
+
+      if (data.error.code === 'InvalidSymbol' && pedido) {
+        // Se descarta ese mercado y se sigue: la app no se queda sin datos por uno malo
+        delete this.watch[pedido];
+        TAI.CONFIG.MARKET.symbols = TAI.CONFIG.MARKET.symbols.filter(function (s) { return s.code !== pedido; });
+        this.emit('symbols', { symbols: TAI.CONFIG.MARKET.symbols });
+        console.warn('[MarketAPI] símbolo descartado:', pedido);
+        return;
+      }
+
       console.warn('[MarketAPI]', this.lastError);
       this.emit('error', { message: data.error.message || 'Error del proveedor de datos.', code: data.error.code });
       this._setState('error', 'No puedo acceder a los datos del mercado en este momento.');
+      return;
+    }
+
+    if (data.msg_type === 'active_symbols') {
+      if (this._symbolsTimer) { clearTimeout(this._symbolsTimer); this._symbolsTimer = null; }
+      var ok = this._loadSymbols(data.active_symbols);
+      if (!ok) this.emit('error', { message: 'El proveedor no devolvió mercados disponibles.', code: 'NoSymbols' });
+      this._startStreams();
       return;
     }
 
@@ -2859,10 +2941,10 @@ TAI.getSymbol = function (code) {
         {
           name: 'Índices y cripto',
           symbols: [
-            { name: 'CAPITALCOM:US100', displayName: 'Nasdaq 100' },
+            { name: 'OANDA:NAS100USD', displayName: 'Nasdaq 100' },
             { name: 'TVC:GOLD', displayName: 'Oro' },
             { name: 'BINANCE:BTCUSDT', displayName: 'BTC/USDT' },
-            { name: 'TVC:VIX', displayName: 'VIX' }
+            { name: 'TVC:DXY', displayName: 'Índice dólar' }
           ]
         }
       ],
@@ -3303,6 +3385,16 @@ TAI.getSymbol = function (code) {
       UI.setChartOverlay(null);
       refreshPrice();
       maybeLiveAnalysis();
+    });
+
+    // La lista real de mercados llega del servidor: se reconstruye la interfaz
+    Market.on('symbols', function (p) {
+      UI.fillMarketSelect(p.symbols, Market.symbol || state.symbol);
+      if (Market.symbol) {
+        state.symbol = Market.symbol;
+        UI.setMarket(TAI.getSymbol(state.symbol));
+      }
+      refreshWatchlist(true);
     });
 
     Market.on('watch', function () { refreshWatchlist(); });
