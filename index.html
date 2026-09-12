@@ -441,6 +441,44 @@ p { margin: 0; }
 
 .cd-state { font-size: 0.8rem; color: var(--ink-dim); letter-spacing: 0.04em; }
 
+/* --------------------------- tablas de mercado --------------------------- */
+
+.watch-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.watch-head h2 { font-size: 0.95rem; }
+.watch-source { font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+
+table.watch { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+table.watch th {
+  text-align: right;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  font-weight: 500;
+  padding: 0 0 7px;
+  border-bottom: 1px solid var(--panel-line);
+}
+table.watch th:first-child { text-align: left; }
+table.watch td {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(148, 178, 255, 0.06);
+  font-family: var(--mono);
+  text-align: right;
+  white-space: nowrap;
+}
+table.watch td:first-child { text-align: left; font-family: var(--sans); }
+table.watch tbody tr { cursor: pointer; }
+table.watch tbody tr:hover td { background: rgba(148, 178, 255, 0.05); }
+table.watch tr[data-active="true"] td { color: var(--ink); background: rgba(139, 107, 255, 0.10); }
+table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 var(--signal); padding-left: 8px; }
+.watch-var[data-dir="up"] { color: var(--up); }
+.watch-var[data-dir="down"] { color: var(--down); }
+.watch-var[data-dir="flat"] { color: var(--flat); }
+.watch-empty { text-align: center !important; color: var(--ink-dim); font-family: var(--sans) !important; padding: 16px 0 !important; }
+.watch-note { margin-top: 9px; font-size: 0.7rem; color: var(--ink-dim); line-height: 1.45; }
+
+.tv-widget { height: 340px; border-radius: var(--r-md); overflow: hidden; }
+
 /* ------------------------------ historial ------------------------------ */
 
 .panel--history h2 { font-size: 0.95rem; margin-bottom: 10px; }
@@ -563,6 +601,8 @@ p { margin: 0; }
   .panel--chat { grid-column: 2; }
   .panel--analysis { grid-column: 1; }
   .panel--confirm, .panel--countdown, .panel--history { grid-column: 2; }
+  .panel--watch { grid-column: 1; }
+  .panel--tv { grid-column: 2; }
   .mic-dock {
     background: linear-gradient(180deg, rgba(5, 8, 15, 0), rgba(5, 8, 15, 0.95) 40%);
   }
@@ -714,6 +754,34 @@ p { margin: 0; }
 
       <p class="cd-state" id="cdState">Análisis en ejecución</p>
       <button type="button" class="btn btn--ghost" id="talkAgainBtn">Hablar de nuevo</button>
+    </section>
+
+
+    <!-- ------------------------ TABLA DE MERCADOS ------------------------ -->
+    <section class="panel panel--watch" aria-label="Índices de volatilidad">
+      <div class="watch-head">
+        <h2>Índices de volatilidad</h2>
+        <span class="watch-source">Deriv · en vivo</span>
+      </div>
+      <table class="watch">
+        <thead>
+          <tr><th>Mercado</th><th>Último</th><th>Var. 60 ticks</th><th>Ticks</th></tr>
+        </thead>
+        <tbody id="watchBody">
+          <tr><td colspan="4" class="watch-empty">Conectando con los mercados…</td></tr>
+        </tbody>
+      </table>
+      <p class="watch-note">Toca una fila para analizar ese índice.</p>
+    </section>
+
+    <!-- ---------------------- MERCADOS GLOBALES (TV) ---------------------- -->
+    <section class="panel panel--tv" aria-label="Mercados globales">
+      <div class="watch-head">
+        <h2>Mercados globales</h2>
+        <span class="watch-source">TradingView</span>
+      </div>
+      <div class="tv-widget" id="tvWidget"></div>
+      <p class="watch-note">Contexto de mercado. TradingView no publica los índices sintéticos de Deriv, así que esta tabla es de referencia: la IA analiza los índices de volatilidad de arriba.</p>
     </section>
 
     <!-- ---------------------------- HISTORIAL ---------------------------- -->
@@ -873,6 +941,7 @@ TAI.getSymbol = function (code) {
     this.reconnectDelay = CFG.reconnectDelayMs;
     this.manualClose = false;
     this._pendingSymbol = null;
+    this.watch = {};                 // { symbol: { ticks:[], subId } } resto de mercados
     this._endpointIndex = 0;
     this._pingTimer = null;
     this.lastError = null;
@@ -920,7 +989,9 @@ TAI.getSymbol = function (code) {
       self._setState('connected', 'Datos de mercado conectados (' + base + ').');
       var target = self._pendingSymbol || self.symbol || TAI.CONFIG.MARKET.defaultSymbol;
       self._pendingSymbol = null;
+      self.watch = {};
       self.subscribe(target, true);
+      self.subscribeWatchlist();
     };
 
     this.socket.onmessage = function (event) {
@@ -1005,6 +1076,9 @@ TAI.getSymbol = function (code) {
       this.subscriptionId = null;
     }
 
+    this._forgetWatch(symbol);          // deja de seguirlo en la tabla: pasa a ser el activo
+    var previous = this.symbol;
+
     this.symbol = symbol;
     this.ticks = [];
     this.emit('history', { symbol: symbol, ticks: [] });
@@ -1017,6 +1091,54 @@ TAI.getSymbol = function (code) {
       style: 'ticks',
       subscribe: 1
     });
+
+    if (previous && previous !== symbol) this.subscribeWatchlist();   // el anterior vuelve a la tabla
+  };
+
+  /**
+   * Suscribe el resto de índices con un historial corto, solo para la tabla.
+   * El mercado activo se excluye: Deriv rechaza dos suscripciones al mismo símbolo.
+   */
+  MarketAPI.prototype.subscribeWatchlist = function () {
+    var self = this;
+    if (!this.isConnected()) return;
+
+    TAI.CONFIG.MARKET.symbols.forEach(function (s) {
+      if (s.code === self.symbol) return;
+      if (self.watch[s.code]) return;
+      self.watch[s.code] = { ticks: [], subId: null };
+      self._send({
+        ticks_history: s.code,
+        adjust_start_time: 1,
+        count: 60,
+        end: 'latest',
+        style: 'ticks',
+        subscribe: 1
+      });
+    });
+  };
+
+  MarketAPI.prototype._forgetWatch = function (symbol) {
+    var entry = this.watch[symbol];
+    if (!entry) return;
+    if (entry.subId) this._send({ forget: entry.subId });
+    delete this.watch[symbol];
+  };
+
+  /** Fila de la tabla para un símbolo: último precio y variación reciente. */
+  MarketAPI.prototype.getWatchRow = function (symbol) {
+    var ticks = symbol === this.symbol ? this.ticks : (this.watch[symbol] ? this.watch[symbol].ticks : []);
+    if (!ticks.length) return { symbol: symbol, last: null, changePct: null, count: 0 };
+
+    var last = ticks[ticks.length - 1].price;
+    var ref = ticks[Math.max(0, ticks.length - 60)].price;
+    return {
+      symbol: symbol,
+      last: last,
+      changePct: ref ? (last - ref) / ref * 100 : null,
+      count: ticks.length,
+      active: symbol === this.symbol
+    };
   };
 
   MarketAPI.prototype._handleMessage = function (data) {
@@ -1034,7 +1156,18 @@ TAI.getSymbol = function (code) {
       var prices = data.history.prices || [];
       var times = data.history.times || [];
       var symbol = (data.echo_req && data.echo_req.ticks_history) || this.symbol;
-      if (symbol !== this.symbol) return; // respuesta de un mercado ya descartado
+
+      if (symbol !== this.symbol) {
+        var entry = this.watch[symbol];
+        if (!entry) return;                       // respuesta de un mercado ya descartado
+        if (data.subscription) entry.subId = data.subscription.id;
+        entry.ticks = prices.map(function (p, i) {
+          return { time: Number(times[i]), price: Number(p) };
+        }).filter(function (t) { return isFinite(t.price); });
+        this.emit('watch', { symbol: symbol });
+        return;
+      }
+
       if (data.subscription) this.subscriptionId = data.subscription.id;
 
       this.ticks = prices.map(function (p, i) {
@@ -1047,7 +1180,16 @@ TAI.getSymbol = function (code) {
 
     if (data.msg_type === 'tick' && data.tick) {
       var t = data.tick;
-      if (t.symbol !== this.symbol) return;
+
+      if (t.symbol !== this.symbol) {
+        var w = this.watch[t.symbol];
+        if (!w) return;
+        if (data.subscription) w.subId = data.subscription.id;
+        w.ticks.push({ time: Number(t.epoch), price: Number(t.quote) });
+        if (w.ticks.length > 120) w.ticks = w.ticks.slice(-60);
+        this.emit('watch', { symbol: t.symbol });
+        return;
+      }
       if (data.subscription) this.subscriptionId = data.subscription.id;
 
       var tick = { time: Number(t.epoch), price: Number(t.quote) };
@@ -2505,7 +2647,7 @@ TAI.getSymbol = function (code) {
       'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus',
       'marketSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
       'mdLast', 'mdHigh', 'mdLow', 'mdRange', 'mdVol', 'mdTrend', 'mdCount', 'mdInterval',
-      'feedText', 'reconnectBtn',
+      'feedText', 'reconnectBtn', 'watchBody', 'tvWidget',
       'conversation', 'interim', 'micBtn', 'micState', 'micHint', 'waves',
       'analysisPanel', 'resMarket', 'resDirection', 'resConfidence', 'resConfidenceBar',
       'resTicks', 'resDuration', 'resTrend', 'resMomentum', 'resVolatility', 'resReason',
@@ -2597,6 +2739,93 @@ TAI.getSymbol = function (code) {
       host.appendChild(node);
     }
     node.textContent = text;
+  }
+
+  /**
+   * Tabla de índices de volatilidad con datos en vivo.
+   * @param {Array} rows [{ symbol, label, last, changePct, count, active }]
+   * @param {Function} onSelect callback al tocar una fila
+   */
+  function renderWatchlist(rows, onSelect) {
+    if (!el.watchBody) return;
+    el.watchBody.innerHTML = '';
+
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.dataset.active = r.active ? 'true' : 'false';
+      tr.tabIndex = 0;
+
+      var dir = r.changePct == null ? 'flat' : r.changePct > 0 ? 'up' : r.changePct < 0 ? 'down' : 'flat';
+      var variacion = r.changePct == null ? '—' : (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(3) + '%';
+
+      tr.innerHTML = '<td></td><td></td><td class="watch-var" data-dir="' + dir + '"></td><td></td>';
+      tr.children[0].textContent = r.label;
+      tr.children[1].textContent = r.last == null ? '—' : r.last.toFixed(r.decimals);
+      tr.children[2].textContent = variacion;
+      tr.children[3].textContent = r.count || 0;
+
+      tr.addEventListener('click', function () { onSelect(r.symbol); });
+      tr.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(r.symbol); }
+      });
+
+      el.watchBody.appendChild(tr);
+    });
+  }
+
+  /** Widget oficial de TradingView con mercados globales (contexto, no sintéticos). */
+  function mountTradingViewWidget() {
+    if (!el.tvWidget || el.tvWidget.dataset.mounted === 'true') return;
+    el.tvWidget.dataset.mounted = 'true';
+
+    var wrap = document.createElement('div');
+    wrap.className = 'tradingview-widget-container';
+    wrap.style.height = '100%';
+
+    var inner = document.createElement('div');
+    inner.className = 'tradingview-widget-container__widget';
+    inner.style.height = '100%';
+    wrap.appendChild(inner);
+
+    var script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.async = true;
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-market-quotes.js';
+    script.innerHTML = JSON.stringify({
+      width: '100%',
+      height: '100%',
+      symbolsGroups: [
+        {
+          name: 'Divisas',
+          symbols: [
+            { name: 'FX:EURUSD', displayName: 'EUR/USD' },
+            { name: 'FX:GBPUSD', displayName: 'GBP/USD' },
+            { name: 'FX:USDJPY', displayName: 'USD/JPY' },
+            { name: 'FX_IDC:USDCOP', displayName: 'USD/COP' }
+          ]
+        },
+        {
+          name: 'Índices y cripto',
+          symbols: [
+            { name: 'CAPITALCOM:US100', displayName: 'Nasdaq 100' },
+            { name: 'TVC:GOLD', displayName: 'Oro' },
+            { name: 'BINANCE:BTCUSDT', displayName: 'BTC/USDT' },
+            { name: 'TVC:VIX', displayName: 'VIX' }
+          ]
+        }
+      ],
+      showSymbolLogo: true,
+      isTransparent: true,
+      colorTheme: 'dark',
+      locale: 'es'
+    });
+
+    script.onerror = function () {
+      el.tvWidget.innerHTML = '<p class="watch-note">No se pudo cargar el widget de TradingView.</p>';
+    };
+
+    wrap.appendChild(script);
+    el.tvWidget.appendChild(wrap);
   }
 
   function setFeedText(text) {
@@ -2769,6 +2998,8 @@ TAI.getSymbol = function (code) {
     renderMarketData: renderMarketData,
     setFeedText: setFeedText,
     setChartOverlay: setChartOverlay,
+    renderWatchlist: renderWatchlist,
+    mountTradingViewWidget: mountTradingViewWidget,
     setInterim: setInterim,
     renderAnalysis: renderAnalysis,
     showCountdown: showCountdown,
@@ -2831,6 +3062,8 @@ TAI.getSymbol = function (code) {
     if (!Voice.supported) {
       UI.toast('El reconocimiento de voz no está disponible en este navegador. Puedes escribir tu petición.');
     }
+
+    UI.mountTradingViewWidget();
 
     bindUI();
     bindVoice();
@@ -3018,6 +3251,8 @@ TAI.getSymbol = function (code) {
       maybeLiveAnalysis();
     });
 
+    Market.on('watch', function () { refreshWatchlist(); });
+
     Market.on('error', function (p) { UI.toast(p.message); });
   }
 
@@ -3052,6 +3287,26 @@ TAI.getSymbol = function (code) {
     }
   }
 
+  var lastWatchRender = 0;
+
+  /** Refresca la tabla de índices como mucho dos veces por segundo. */
+  function refreshWatchlist(force) {
+    if (!force && Date.now() - lastWatchRender < 500) return;
+    lastWatchRender = Date.now();
+
+    var rows = CFG.MARKET.symbols.map(function (s) {
+      var row = Market.getWatchRow(s.code);
+      row.label = s.label;
+      row.decimals = s.decimals;
+      row.active = s.code === state.symbol;
+      return row;
+    });
+
+    UI.renderWatchlist(rows, function (symbol) {
+      if (switchMarket(symbol, true)) refreshWatchlist(true);
+    });
+  }
+
   var lastPanelUpdate = 0;
 
   function refreshPrice() {
@@ -3063,6 +3318,7 @@ TAI.getSymbol = function (code) {
       change = (data.lastPrice - first) / first * 100;
     }
     UI.setPrice(data.lastPrice, def.decimals, change, data.ticks.length);
+    refreshWatchlist();
 
     // El panel de métricas se recalcula como mucho dos veces por segundo
     if (Date.now() - lastPanelUpdate < 500) return;
@@ -3110,7 +3366,9 @@ TAI.getSymbol = function (code) {
     UI.setMarket(def);
     UI.setPrice(null, def.decimals, null, 0);
     state.chart.setData([], def.decimals);
+    UI.setChartOverlay('Cargando ' + def.label + '…');
     Market.subscribe(symbol);
+    refreshWatchlist(true);
     if (announce) UI.addMessage('ai', 'Mercado activo: ' + def.label + '.');
     return true;
   }
