@@ -818,6 +818,8 @@ TAI.CONFIG = {
     simulationMode: true,      // arranca siempre en simulación
     allowRealTrading: false,   // ninguna orden real puede enviarse desde aquí
     countdownSeconds: 10,
+    autoBrief: true,             // al conectar, rellena el escenario sin esperar comandos
+    liveRefreshMs: 15000,        // refresco del escenario mientras no hay turno activo
     historyLimit: 8,
     lang: 'es-ES',
     speechRate: 0.95,          // algo más lento: suena natural, no robótico
@@ -2803,6 +2805,8 @@ TAI.getSymbol = function (code) {
     micOpen: false,      // el micrófono queda abierto tras un solo toque
     pendingInput: null,
     busySince: 0,
+    autoBriefDone: false,
+    lastLiveRefresh: 0,
     silenceStreak: 0,    // turnos seguidos sin escuchar nada
     greeted: false
   };
@@ -3002,16 +3006,50 @@ TAI.getSymbol = function (code) {
       var def = TAI.getSymbol(p.symbol);
       state.chart.setData(p.ticks, def ? def.decimals : 3);
       UI.setChartOverlay(p.ticks.length ? null : 'Esperando los primeros ticks…');
+      state.autoBriefDone = false;          // mercado nuevo: se vuelve a resumir
       refreshPrice();
+      maybeLiveAnalysis();
     });
 
     Market.on('tick', function (p) {
       state.chart.push(p.tick);
       UI.setChartOverlay(null);
       refreshPrice();
+      maybeLiveAnalysis();
     });
 
     Market.on('error', function (p) { UI.toast(p.message); });
+  }
+
+  /**
+   * Rellena el escenario con los datos ya recibidos, sin voz ni cuenta regresiva.
+   * Así la pantalla nunca está vacía: muestra lectura del mercado en cuanto hay datos,
+   * y se refresca sola mientras no haya una conversación en curso.
+   */
+  function maybeLiveAnalysis() {
+    if (!CFG.APP.autoBrief) return;
+    if (state.busy || !Market.hasEnoughData()) return;
+
+    var primera = !state.autoBriefDone;
+    if (!primera && Date.now() - state.lastLiveRefresh < CFG.APP.liveRefreshMs) return;
+
+    var data = Market.getMarketData();
+    var analysis = TAI.AnalysisEngine.analyzeMarket({ symbol: data.symbol, ticks: data.ticks });
+    if (!analysis.ok) return;
+
+    state.lastAnalysis = analysis;
+    state.lastLiveRefresh = Date.now();
+    UI.renderAnalysis(analysis);
+    UI.setStatus('analysis', 'waiting');
+
+    if (primera) {
+      state.autoBriefDone = true;
+      UI.addMessage('ai', 'Ya tengo datos de ' + analysis.market + ': ' + analysis.trend.toLowerCase() +
+        ', momentum ' + analysis.momentum.toLowerCase() + ', volatilidad ' +
+        analysis.metrics.volatility.toFixed(3) + '% por tick. Lectura actual: ' +
+        (analysis.direction === 'WAIT' ? 'sin dirección clara' : analysis.direction) +
+        '. Dime «analiza» cuando quieras el escenario completo.');
+    }
   }
 
   var lastPanelUpdate = 0;
