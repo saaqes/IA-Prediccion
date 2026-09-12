@@ -1,0 +1,3283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#05080f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Trading AI — asistente de voz para análisis y predicción de índices de volatilidad.">
+  <title>Trading AI · AI Market Prediction</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+/* =========================================================
+   Trading AI — tema oscuro de terminal
+   ========================================================= */
+
+:root {
+  --bg: #05080f;
+  --bg-elev: #0b1220;
+  --panel: rgba(148, 178, 255, 0.045);
+  --panel-line: rgba(148, 178, 255, 0.14);
+  --ink: #e8edf6;
+  --ink-dim: #8ea0bd;
+  --up: #2ee6a8;
+  --down: #ff5a76;
+  --flat: #8ea0bd;
+  --signal: #8b6bff;
+  --warn: #ffc766;
+
+  --r-lg: 18px;
+  --r-md: 12px;
+  --r-sm: 8px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --dock-height: 168px;
+
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  padding-bottom: calc(var(--dock-height) + var(--safe-bottom));
+  background-image:
+    radial-gradient(1200px 520px at 12% -10%, rgba(139, 107, 255, 0.16), transparent 60%),
+    radial-gradient(900px 460px at 92% 4%, rgba(46, 230, 168, 0.10), transparent 62%);
+  background-attachment: fixed;
+}
+
+h1, h2 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+p { margin: 0; }
+
+/* ------------------------------ topbar ------------------------------ */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: calc(var(--safe-top) + 14px) 16px 12px;
+  background: linear-gradient(180deg, rgba(5, 8, 15, 0.96), rgba(5, 8, 15, 0.72));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand__name { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.01em; }
+.brand__sub { color: var(--ink-dim); font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; }
+
+.statusbar {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.statusbar::-webkit-scrollbar { display: none; }
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 6px 11px;
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 0.7rem;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.status__text b { color: var(--ink); font-family: var(--mono); font-weight: 600; margin-left: 4px; font-size: 0.68rem; }
+.status__dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--flat);
+  box-shadow: 0 0 0 3px rgba(142, 160, 189, 0.14);
+}
+.status[data-tone="ok"] .status__dot { background: var(--up); box-shadow: 0 0 0 3px rgba(46, 230, 168, 0.18); }
+.status[data-tone="warn"] .status__dot { background: var(--warn); box-shadow: 0 0 0 3px rgba(255, 199, 102, 0.18); animation: pulse 1.4s ease-in-out infinite; }
+.status[data-tone="bad"] .status__dot { background: var(--down); box-shadow: 0 0 0 3px rgba(255, 90, 118, 0.18); }
+
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+/* --------------------------- aviso simulación --------------------------- */
+
+.sim-banner {
+  margin: 12px 16px 0;
+  padding: 9px 13px;
+  border: 1px solid rgba(255, 199, 102, 0.35);
+  border-radius: var(--r-md);
+  background: rgba(255, 199, 102, 0.08);
+  color: var(--warn);
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+}
+
+/* ------------------------------ layout ------------------------------ */
+
+.layout {
+  display: grid;
+  gap: 12px;
+  padding: 12px 16px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.panel {
+  border: 1px solid var(--panel-line);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(148, 178, 255, 0.06), rgba(148, 178, 255, 0.02));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 14px;
+}
+
+/* ------------------------------ mercado ------------------------------ */
+
+.market-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.field { display: block; }
+.field__label {
+  display: block;
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 5px;
+}
+
+.select {
+  appearance: none;
+  background: var(--bg-elev);
+  color: var(--ink);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--r-sm);
+  padding: 8px 30px 8px 11px;
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  min-width: 180px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-dim) 50%), linear-gradient(135deg, var(--ink-dim) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.select:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+.market-name { margin-top: 8px; font-size: 0.8rem; color: var(--ink-dim); }
+
+.price { text-align: right; display: grid; gap: 3px; }
+.price__value { font-family: var(--mono); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; }
+.price__change { font-family: var(--mono); font-size: 0.82rem; }
+.price__change[data-dir="up"] { color: var(--up); }
+.price__change[data-dir="down"] { color: var(--down); }
+.price__change[data-dir="flat"] { color: var(--flat); }
+.price__ticks { font-size: 0.68rem; color: var(--ink-dim); letter-spacing: 0.08em; }
+
+.chart-wrap {
+  position: relative;
+  height: 240px;
+  border-radius: var(--r-md);
+  background: rgba(3, 6, 12, 0.55);
+  border: 1px solid rgba(148, 178, 255, 0.08);
+  overflow: hidden;
+}
+.chart-wrap .tv-lightweight-charts { border-radius: var(--r-md); }
+.chart-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0 18px;
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  background: rgba(3, 6, 12, 0.72);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.marketdata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 6px;
+  margin: 10px 0 0;
+}
+.marketdata > div {
+  border: 1px solid var(--panel-line);
+  border-radius: var(--r-sm);
+  padding: 7px 9px;
+  background: rgba(3, 6, 12, 0.35);
+}
+.marketdata dt { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.marketdata dd { margin: 3px 0 0; font-family: var(--mono); font-size: 0.82rem; }
+
+.feed {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 9px;
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+.link-btn {
+  background: none;
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  color: var(--ink-dim);
+  padding: 4px 11px;
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.link-btn:hover { color: var(--ink); border-color: rgba(148, 178, 255, 0.3); }
+.link-btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+/* ---------------------------- conversación ---------------------------- */
+
+.conversation {
+  max-height: 260px;
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.msg { display: grid; gap: 3px; }
+.msg__who { font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
+.msg__body {
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 46ch;
+}
+.msg--user .msg__body {
+  background: rgba(139, 107, 255, 0.14);
+  border: 1px solid rgba(139, 107, 255, 0.3);
+}
+.msg--user { justify-items: end; }
+.msg--ai .msg__body {
+  background: rgba(148, 178, 255, 0.06);
+  border: 1px solid var(--panel-line);
+}
+
+.interim {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--signal);
+  opacity: 0.9;
+}
+
+.composer { display: flex; gap: 8px; margin-top: 12px; }
+.input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-elev);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  padding: 11px 12px;
+  font-family: var(--sans);
+  font-size: 16px;           /* evita el zoom automático en iOS */
+}
+.input:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
+
+.btn {
+  border-radius: var(--r-sm);
+  border: 1px solid var(--panel-line);
+  padding: 11px 16px;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--panel);
+  color: var(--ink);
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.btn:hover { background: rgba(148, 178, 255, 0.12); }
+.btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.btn--primary {
+  background: var(--up);
+  border-color: var(--up);
+  color: #04120c;
+  font-weight: 600;
+}
+.btn--primary:hover { background: #4cf0b8; }
+
+/* ------------------------------ análisis ------------------------------ */
+
+.analysis-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.analysis-head h2 { font-size: 0.95rem; }
+.analysis-market { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-dim); }
+
+.direction {
+  margin: 12px 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid;
+}
+.direction[data-dir="up"] { color: var(--up); border-color: rgba(46, 230, 168, 0.4); background: rgba(46, 230, 168, 0.08); }
+.direction[data-dir="down"] { color: var(--down); border-color: rgba(255, 90, 118, 0.4); background: rgba(255, 90, 118, 0.08); }
+.direction[data-dir="flat"] { color: var(--flat); border-color: var(--panel-line); background: var(--panel); }
+
+.confidence__row { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--ink-dim); }
+.confidence__row b { font-family: var(--mono); color: var(--ink); }
+.confidence__track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 178, 255, 0.12);
+  overflow: hidden;
+  margin: 7px 0;
+}
+.confidence__track span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--signal), var(--up));
+  transition: width 0.5s ease;
+}
+.disclaimer { font-size: 0.72rem; color: var(--ink-dim); line-height: 1.45; }
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+.metrics > div {
+  border: 1px solid var(--panel-line);
+  border-radius: var(--r-md);
+  padding: 9px 10px;
+  background: rgba(3, 6, 12, 0.35);
+}
+.metrics dt { font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.metrics dd { margin: 4px 0 0; font-family: var(--mono); font-size: 0.92rem; }
+
+.reason { font-size: 0.82rem; line-height: 1.55; color: var(--ink-dim); }
+
+/* ---------------------------- confirmación ---------------------------- */
+
+.panel--confirm { border-color: rgba(255, 199, 102, 0.35); }
+.panel--confirm h2 { font-size: 0.95rem; margin-bottom: 6px; }
+.panel--confirm > p { font-size: 0.8rem; color: var(--ink-dim); }
+
+.confirm-details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin: 12px 0;
+  font-size: 0.85rem;
+}
+.confirm-details dt { color: var(--ink-dim); }
+.confirm-details dd { margin: 0; font-family: var(--mono); text-align: right; }
+
+.confirm-actions { display: flex; gap: 8px; }
+.confirm-actions .btn { flex: 1; }
+
+/* ---------------------------- cuenta regresiva ---------------------------- */
+
+.panel--countdown { display: grid; justify-items: center; gap: 12px; text-align: center; }
+
+.cd-info { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.cd-info span {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line);
+  background: var(--panel);
+}
+.cd-dir[data-dir="up"] { color: var(--up); border-color: rgba(46, 230, 168, 0.45); }
+.cd-dir[data-dir="down"] { color: var(--down); border-color: rgba(255, 90, 118, 0.45); }
+
+.ring { position: relative; width: 138px; height: 138px; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 6; }
+.ring__bg { stroke: rgba(148, 178, 255, 0.12); }
+.ring__fg {
+  stroke: var(--up);
+  stroke-linecap: round;
+  stroke-dasharray: 327;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.12s linear;
+}
+.ring__value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 2.6rem;
+  font-weight: 600;
+}
+
+.cd-state { font-size: 0.8rem; color: var(--ink-dim); letter-spacing: 0.04em; }
+
+/* ------------------------------ historial ------------------------------ */
+
+.panel--history h2 { font-size: 0.95rem; margin-bottom: 10px; }
+.history { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.history__empty { font-size: 0.8rem; color: var(--ink-dim); }
+.history__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--r-md);
+  background: rgba(3, 6, 12, 0.35);
+  font-size: 0.82rem;
+}
+.history__dir { font-family: var(--mono); font-weight: 600; text-align: right; }
+.history__dir[data-dir="up"] { color: var(--up); }
+.history__dir[data-dir="down"] { color: var(--down); }
+.history__meta { grid-column: 1 / -1; font-family: var(--mono); font-size: 0.7rem; color: var(--ink-dim); }
+
+/* ------------------------------ micrófono ------------------------------ */
+
+.mic-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 14px 16px calc(14px + var(--safe-bottom));
+  background: linear-gradient(180deg, rgba(5, 8, 15, 0), rgba(5, 8, 15, 0.92) 32%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.mic {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  border: 1px solid rgba(139, 107, 255, 0.5);
+  background: radial-gradient(circle at 50% 35%, rgba(139, 107, 255, 0.45), rgba(11, 18, 32, 0.95));
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 10px 30px rgba(139, 107, 255, 0.25);
+}
+.mic:active { transform: scale(0.95); }
+.mic:focus-visible { outline: 3px solid var(--signal); outline-offset: 4px; }
+.mic svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+
+.mic[data-state="listening"] {
+  border-color: var(--down);
+  background: radial-gradient(circle at 50% 35%, rgba(255, 90, 118, 0.5), rgba(11, 18, 32, 0.95));
+  box-shadow: 0 0 0 0 rgba(255, 90, 118, 0.45);
+  animation: mic-pulse 1.5s ease-out infinite;
+}
+.mic[data-state="analyzing"],
+.mic[data-state="processing"] { border-color: var(--warn); box-shadow: 0 10px 30px rgba(255, 199, 102, 0.22); }
+.mic[data-state="speaking"] { border-color: var(--up); box-shadow: 0 10px 30px rgba(46, 230, 168, 0.24); }
+
+@keyframes mic-pulse {
+  70% { box-shadow: 0 0 0 22px rgba(255, 90, 118, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 90, 118, 0); }
+}
+
+.mic-state { font-size: 0.88rem; font-weight: 500; margin-top: 6px; }
+.mic-hint { font-size: 0.72rem; color: var(--ink-dim); text-align: center; }
+
+.waves { display: flex; align-items: flex-end; gap: 4px; height: 22px; margin-bottom: 2px; }
+.waves span {
+  width: 3px;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--down);
+  animation: wave 0.9s ease-in-out infinite;
+}
+.waves span:nth-child(2) { animation-delay: 0.12s; }
+.waves span:nth-child(3) { animation-delay: 0.24s; }
+.waves span:nth-child(4) { animation-delay: 0.36s; }
+.waves span:nth-child(5) { animation-delay: 0.48s; }
+
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+/* -------------------------------- toast -------------------------------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  transform: translate(-50%, 12px);
+  bottom: calc(var(--dock-height) + var(--safe-bottom) + 8px);
+  z-index: 40;
+  max-width: min(92vw, 440px);
+  padding: 11px 15px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(255, 199, 102, 0.4);
+  background: rgba(20, 16, 6, 0.96);
+  color: var(--warn);
+  font-size: 0.82rem;
+  opacity: 0;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ------------------------------ escritorio ------------------------------ */
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+    align-items: start;
+  }
+  .panel--market { grid-column: 1; grid-row: 1 / span 2; }
+  .chart-wrap { height: 340px; }
+  .panel--chat { grid-column: 2; }
+  .panel--analysis { grid-column: 1; }
+  .panel--confirm, .panel--countdown, .panel--history { grid-column: 2; }
+  .mic-dock {
+    background: linear-gradient(180deg, rgba(5, 8, 15, 0), rgba(5, 8, 15, 0.95) 40%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <h1 class="brand__name">Trading AI</h1>
+      <p class="brand__sub">AI Market Prediction</p>
+    </div>
+
+    <div class="statusbar" role="status" aria-live="polite">
+      <div class="status" id="apiStatus" data-tone="idle">
+        <span class="status__dot" aria-hidden="true"></span>
+        <span class="status__text">Datos <b class="status-value">SIN CONEXIÓN</b></span>
+      </div>
+      <div class="status" id="aiStatus" data-tone="idle">
+        <span class="status__dot" aria-hidden="true"></span>
+        <span class="status__text">IA <b class="status-value">ACTIVA</b></span>
+      </div>
+      <div class="status" id="voiceStatus" data-tone="idle">
+        <span class="status__dot" aria-hidden="true"></span>
+        <span class="status__text">Voz <b class="status-value">LISTA</b></span>
+      </div>
+      <div class="status" id="analysisStatus" data-tone="idle">
+        <span class="status__dot" aria-hidden="true"></span>
+        <span class="status__text">Análisis <b class="status-value">EN ESPERA</b></span>
+      </div>
+    </div>
+  </header>
+
+  <p class="sim-banner" id="simBanner">
+    Simulación — no se está ejecutando ninguna operación real.
+  </p>
+
+  <main class="layout">
+
+    <!-- ---------------------------- MERCADO ---------------------------- -->
+    <section class="panel panel--market" aria-label="Mercado">
+      <div class="market-head">
+        <div>
+          <label class="field">
+            <span class="field__label">Mercado</span>
+            <select id="marketSelect" class="select"></select>
+          </label>
+          <p class="market-name" id="marketLabel">Volatility 75</p>
+        </div>
+        <div class="price">
+          <span class="price__value" id="lastPrice">—</span>
+          <span class="price__change" id="priceChange" data-dir="flat">—</span>
+          <span class="price__ticks" id="tickCount">0 ticks</span>
+        </div>
+      </div>
+
+      <div class="chart-wrap" id="chart" aria-label="Gráfico de precio en vivo"></div>
+
+      <dl class="marketdata" id="marketData">
+        <div><dt>Último</dt><dd id="mdLast">—</dd></div>
+        <div><dt>Máximo</dt><dd id="mdHigh">—</dd></div>
+        <div><dt>Mínimo</dt><dd id="mdLow">—</dd></div>
+        <div><dt>Rango</dt><dd id="mdRange">—</dd></div>
+        <div><dt>Volatilidad</dt><dd id="mdVol">—</dd></div>
+        <div><dt>Tendencia</dt><dd id="mdTrend">—</dd></div>
+        <div><dt>Ticks</dt><dd id="mdCount">0</dd></div>
+        <div><dt>Intervalo</dt><dd id="mdInterval">—</dd></div>
+      </dl>
+
+      <p class="feed" id="feedState">
+        <span id="feedText">Conectando con el mercado…</span>
+        <button type="button" class="link-btn" id="reconnectBtn">Reconectar</button>
+      </p>
+    </section>
+
+    <!-- --------------------------- CONVERSACIÓN --------------------------- -->
+    <section class="panel panel--chat" aria-label="Conversación con Trading AI">
+      <div class="conversation" id="conversation" aria-live="polite"></div>
+      <p class="interim" id="interim" hidden></p>
+
+      <div class="composer">
+        <input type="text" id="textInput" class="input" placeholder="Escribe si no puedes usar voz…"
+               autocomplete="off" enterkeyhint="send" aria-label="Escribe tu petición">
+        <button type="button" id="sendBtn" class="btn btn--ghost">Enviar</button>
+      </div>
+    </section>
+
+    <!-- ---------------------------- ANÁLISIS ---------------------------- -->
+    <section class="panel panel--analysis" id="analysisPanel" aria-label="Resultado del análisis">
+      <div class="analysis-head">
+        <h2>Escenario estimado</h2>
+        <span class="analysis-market" id="resMarket">Sin análisis todavía</span>
+      </div>
+
+      <p class="direction" id="resDirection" data-dir="flat">Esperando tu petición</p>
+
+      <div class="confidence">
+        <div class="confidence__row">
+          <span>Confianza estimada</span>
+          <b id="resConfidence">—</b>
+        </div>
+        <div class="confidence__track"><span id="resConfidenceBar"></span></div>
+        <p class="disclaimer">Estimación del modelo sobre los datos actuales. No es una garantía ni elimina el riesgo.</p>
+      </div>
+
+      <dl class="metrics">
+        <div><dt>Ticks</dt><dd id="resTicks">—</dd></div>
+        <div><dt>Horizonte</dt><dd id="resDuration">—</dd></div>
+        <div><dt>Tendencia</dt><dd id="resTrend">—</dd></div>
+        <div><dt>Momentum</dt><dd id="resMomentum">—</dd></div>
+        <div><dt>Volatilidad</dt><dd id="resVolatility">—</dd></div>
+      </dl>
+
+      <p class="reason" id="resReason">Pulsa el micrófono y di «analiza Volatility 75 1s», o escríbelo en el cuadro de texto. El escenario aparecerá aquí con la dirección probable, la confianza estimada y el horizonte en ticks.</p>
+    </section>
+
+    <!-- --------------------------- CONFIRMACIÓN --------------------------- -->
+    <section class="panel panel--confirm" id="confirmPanel" hidden aria-label="Confirmación de ejecución">
+      <h2>Confirma la ejecución</h2>
+      <p>Nada se envía al mercado. El sistema está en modo simulación.</p>
+      <dl class="confirm-details" id="confirmDetails"></dl>
+      <div class="confirm-actions">
+        <button type="button" class="btn btn--primary" id="confirmAccept">Ejecutar análisis</button>
+        <button type="button" class="btn btn--ghost" id="confirmCancel">Cancelar</button>
+      </div>
+    </section>
+
+    <!-- ------------------------- CUENTA REGRESIVA ------------------------- -->
+    <section class="panel panel--countdown" id="countdownCard" hidden aria-label="Cuenta regresiva del análisis">
+      <div class="cd-info">
+        <span class="cd-market" id="cdMarket">—</span>
+        <span class="cd-dir" id="cdDirection" data-dir="flat">—</span>
+        <span class="cd-ticks" id="cdTicks">—</span>
+      </div>
+
+      <div class="ring">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring__bg" cx="60" cy="60" r="52"></circle>
+          <circle class="ring__fg" id="countdownRing" cx="60" cy="60" r="52"></circle>
+        </svg>
+        <span class="ring__value" id="countdownValue">10</span>
+      </div>
+
+      <p class="cd-state" id="cdState">Análisis en ejecución</p>
+      <button type="button" class="btn btn--ghost" id="talkAgainBtn">Hablar de nuevo</button>
+    </section>
+
+    <!-- ---------------------------- HISTORIAL ---------------------------- -->
+    <section class="panel panel--history" aria-label="Análisis recientes">
+      <h2>Análisis recientes</h2>
+      <ul class="history" id="historyList">
+        <li class="history__empty">Todavía no has ejecutado ningún análisis.</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <!-- ------------------------------ MICRÓFONO ------------------------------ -->
+  <div class="mic-dock">
+    <div class="waves" id="waves" hidden aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <button type="button" class="mic" id="micBtn" data-state="idle" aria-pressed="false" aria-label="Hablar con Trading AI">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-5a3.5 3.5 0 0 0-7 0v5A3.5 3.5 0 0 0 12 15Z"></path>
+        <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"></path>
+      </svg>
+    </button>
+    <p class="mic-state" id="micState">Hablar con Trading AI</p>
+    <p class="mic-hint" id="micHint">Pulsa una vez y quedo escuchando. Vuelve a pulsar para terminar.</p>
+  </div>
+
+  <div class="toast" id="toast" role="alert" hidden></div>
+
+  <!-- Librería oficial de gráficos de TradingView (Lightweight Charts) -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+
+  <script>
+/* ==== js/config.js ==== */
+/**
+ * config.js
+ * Configuración central de la aplicación. No contiene secretos.
+ * Cualquier credencial privada debe vivir en un backend/proxy (ver AI.proxyUrl).
+ */
+window.TAI = window.TAI || {};
+
+TAI.CONFIG = {
+  /* ------------------------------------------------------------------ */
+  /* API DE MERCADO (Deriv WebSocket público: solo lectura de ticks)      */
+  /* ------------------------------------------------------------------ */
+  API: {
+    websocketUrl: 'wss://ws.derivws.com/websockets/v3',
+    // Si un endpoint falla se rota al siguiente automáticamente
+    endpoints: [
+      'wss://ws.derivws.com/websockets/v3',
+      'wss://ws.binaryws.com/websockets/v3',
+      'wss://frontend.derivws.com/websockets/v3'
+    ],
+    pingIntervalMs: 25000,
+    // app_id público de demostración de Deriv. Reemplázalo por el tuyo.
+    // NO es un secreto: solo identifica la aplicación para datos públicos.
+    appId: '1089',
+    historyCount: 300,        // ticks iniciales que se solicitan
+    reconnectDelayMs: 2500,
+    maxReconnectDelayMs: 20000,
+    requestTimeoutMs: 12000
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* IA                                                                  */
+  /* ------------------------------------------------------------------ */
+  AI: {
+    // 'LOCAL'  -> motor determinista incluido (analysis-engine.js)
+    // 'PROXY'  -> backend propio que reenvía a OpenAI/Anthropic/etc.
+    provider: 'LOCAL',
+    // Ejemplo: 'https://tu-backend.com/api/trading-ai'  (la API key vive ahí)
+    proxyUrl: '',
+    maxContextTicks: 120,
+    // Si el proxy falla, se usa el motor local en lugar de romper la app.
+    fallbackToLocal: true
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* MERCADOS                                                            */
+  /* ------------------------------------------------------------------ */
+  MARKET: {
+    defaultSymbol: 'R_75',
+    minTicksForAnalysis: 25,
+    symbols: [
+      { code: 'R_10',    label: 'Volatility 10',        index: 10,  oneSecond: false, decimals: 3 },
+      { code: '1HZ10V',  label: 'Volatility 10 (1s)',   index: 10,  oneSecond: true,  decimals: 3 },
+      { code: 'R_25',    label: 'Volatility 25',        index: 25,  oneSecond: false, decimals: 3 },
+      { code: '1HZ25V',  label: 'Volatility 25 (1s)',   index: 25,  oneSecond: true,  decimals: 2 },
+      { code: 'R_50',    label: 'Volatility 50',        index: 50,  oneSecond: false, decimals: 4 },
+      { code: '1HZ50V',  label: 'Volatility 50 (1s)',   index: 50,  oneSecond: true,  decimals: 2 },
+      { code: 'R_75',    label: 'Volatility 75',        index: 75,  oneSecond: false, decimals: 4 },
+      { code: '1HZ75V',  label: 'Volatility 75 (1s)',   index: 75,  oneSecond: true,  decimals: 2 },
+      { code: 'R_100',   label: 'Volatility 100',       index: 100, oneSecond: false, decimals: 2 },
+      { code: '1HZ100V', label: 'Volatility 100 (1s)',  index: 100, oneSecond: true,  decimals: 2 }
+    ]
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* APLICACIÓN                                                          */
+  /* ------------------------------------------------------------------ */
+  APP: {
+    simulationMode: true,      // arranca siempre en simulación
+    allowRealTrading: false,   // ninguna orden real puede enviarse desde aquí
+    countdownSeconds: 10,
+    historyLimit: 8,
+    lang: 'es-ES',
+    speechRate: 0.95,          // algo más lento: suena natural, no robótico
+    speechPitch: 1.12,         // tono ligeramente más alto
+    preferFemaleVoice: true,
+    conversationMode: true,    // un solo toque del micrófono y sigue escuchando
+    greeting: 'Hola, ¿cómo estás? ¿Quieres iniciar un análisis hoy?'
+  }
+};
+
+/** Devuelve la definición de un mercado por su código Deriv. */
+TAI.getSymbol = function (code) {
+  return TAI.CONFIG.MARKET.symbols.find(function (s) { return s.code === code; }) || null;
+};
+
+/* ==== js/market-api.js ==== */
+/**
+ * market-api.js
+ * Única capa que habla con el proveedor de datos de mercado (Deriv WebSocket).
+ * Expone datos REALES. Si no hay conexión, no inventa precios: reporta el estado.
+ *
+ * Eventos emitidos:
+ *   'status'  -> { state: 'connecting'|'connected'|'disconnected'|'error', message }
+ *   'history' -> { symbol, ticks }
+ *   'tick'    -> { symbol, tick, ticks }
+ *   'error'   -> { message, code }
+ */
+(function (TAI) {
+  'use strict';
+
+  var CFG = TAI.CONFIG.API;
+
+  function Emitter() { this._handlers = {}; }
+  Emitter.prototype.on = function (evt, cb) {
+    (this._handlers[evt] = this._handlers[evt] || []).push(cb);
+    return this;
+  };
+  Emitter.prototype.emit = function (evt, payload) {
+    (this._handlers[evt] || []).forEach(function (cb) {
+      try { cb(payload); } catch (err) { console.error('[MarketAPI] handler', evt, err); }
+    });
+  };
+
+  function MarketAPI() {
+    Emitter.call(this);
+    this.socket = null;
+    this.state = 'disconnected';
+    this.symbol = null;
+    this.subscriptionId = null;
+    this.ticks = [];               // [{ time: epochSeconds, price: Number }]
+    this.reconnectDelay = CFG.reconnectDelayMs;
+    this.manualClose = false;
+    this._pendingSymbol = null;
+    this._endpointIndex = 0;
+    this._pingTimer = null;
+    this.lastError = null;
+  }
+  MarketAPI.prototype = Object.create(Emitter.prototype);
+  MarketAPI.prototype.constructor = MarketAPI;
+
+  MarketAPI.prototype._setState = function (state, message) {
+    this.state = state;
+    this.emit('status', { state: state, message: message || '' });
+  };
+
+  MarketAPI.prototype.isConnected = function () {
+    return !!this.socket && this.socket.readyState === WebSocket.OPEN;
+  };
+
+  /** Abre la conexión WebSocket. Idempotente. */
+  MarketAPI.prototype.connect = function () {
+    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) return;
+    if (typeof WebSocket === 'undefined') {
+      this._setState('error', 'Este navegador no soporta WebSocket.');
+      return;
+    }
+    this.manualClose = false;
+    this._setState('connecting', 'Conectando con los datos del mercado…');
+
+    var endpoints = (CFG.endpoints && CFG.endpoints.length) ? CFG.endpoints : [CFG.websocketUrl];
+    var base = endpoints[this._endpointIndex % endpoints.length];
+    var url = base + '?app_id=' + encodeURIComponent(CFG.appId) + '&l=ES';
+    var self = this;
+    this.currentEndpoint = base;
+
+    try {
+      this.socket = new WebSocket(url);
+    } catch (err) {
+      this._setState('error', 'No puedo acceder a los datos del mercado en este momento.');
+      this._scheduleReconnect();
+      return;
+    }
+
+    this.socket.onopen = function () {
+      self.reconnectDelay = CFG.reconnectDelayMs;
+      self.lastError = null;
+      self._startPing();
+      self._setState('connected', 'Datos de mercado conectados (' + base + ').');
+      var target = self._pendingSymbol || self.symbol || TAI.CONFIG.MARKET.defaultSymbol;
+      self._pendingSymbol = null;
+      self.subscribe(target, true);
+    };
+
+    this.socket.onmessage = function (event) {
+      var data;
+      try { data = JSON.parse(event.data); } catch (err) { return; }
+      self._handleMessage(data);
+    };
+
+    this.socket.onerror = function () {
+      self.lastError = 'Fallo de red con ' + base;
+      self._setState('error', 'No puedo acceder a los datos del mercado en este momento.');
+    };
+
+    this.socket.onclose = function (event) {
+      self.subscriptionId = null;
+      self._stopPing();
+      if (self.manualClose) { self._setState('disconnected', 'Conexión cerrada.'); return; }
+      // Si se cerró sin haber llegado a recibir datos, se prueba el siguiente endpoint
+      if (!self.ticks.length) self._endpointIndex++;
+      self._setState('disconnected', 'Sin conexión con los datos del mercado' + (event && event.code ? ' (código ' + event.code + ')' : '') + '.');
+      self._scheduleReconnect();
+    };
+  };
+
+  MarketAPI.prototype._startPing = function () {
+    var self = this;
+    this._stopPing();
+    this._pingTimer = setInterval(function () {
+      self._send({ ping: 1 });        // mantiene viva la conexión en redes móviles
+    }, CFG.pingIntervalMs || 25000);
+  };
+
+  MarketAPI.prototype._stopPing = function () {
+    if (this._pingTimer) clearInterval(this._pingTimer);
+    this._pingTimer = null;
+  };
+
+  /** Reconexión inmediata pedida por el usuario. */
+  MarketAPI.prototype.reconnectNow = function () {
+    this.manualClose = false;
+    this.reconnectDelay = CFG.reconnectDelayMs;
+    if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
+    if (this.socket) { try { this.socket.close(); } catch (e) { /* noop */ } }
+    this.socket = null;
+    this.connect();
+  };
+
+  MarketAPI.prototype._scheduleReconnect = function () {
+    var self = this;
+    if (this._reconnectTimer) return;
+    this._reconnectTimer = setTimeout(function () {
+      self._reconnectTimer = null;
+      self.connect();
+    }, this.reconnectDelay);
+    this.reconnectDelay = Math.min(this.reconnectDelay * 1.6, CFG.maxReconnectDelayMs);
+  };
+
+  MarketAPI.prototype._send = function (payload) {
+    if (!this.isConnected()) return false;
+    this.socket.send(JSON.stringify(payload));
+    return true;
+  };
+
+  /**
+   * Suscribe un mercado. Olvida la suscripción anterior para no duplicar streams.
+   * @param {string} symbol código Deriv (ej. '1HZ75V')
+   */
+  MarketAPI.prototype.subscribe = function (symbol, force) {
+    if (!TAI.getSymbol(symbol)) return;
+    if (!force && symbol === this.symbol) return;
+
+    if (!this.isConnected()) {
+      this._pendingSymbol = symbol;
+      this.symbol = symbol;
+      this.ticks = [];
+      this.connect();
+      return;
+    }
+
+    if (this.subscriptionId) {
+      this._send({ forget: this.subscriptionId });
+      this.subscriptionId = null;
+    }
+
+    this.symbol = symbol;
+    this.ticks = [];
+    this.emit('history', { symbol: symbol, ticks: [] });
+
+    this._send({
+      ticks_history: symbol,
+      adjust_start_time: 1,
+      count: CFG.historyCount,
+      end: 'latest',
+      style: 'ticks',
+      subscribe: 1
+    });
+  };
+
+  MarketAPI.prototype._handleMessage = function (data) {
+    if (data.msg_type === 'ping' || data.ping) return;
+
+    if (data.error) {
+      this.lastError = (data.error.code || '') + ' ' + (data.error.message || '');
+      console.warn('[MarketAPI]', this.lastError);
+      this.emit('error', { message: data.error.message || 'Error del proveedor de datos.', code: data.error.code });
+      this._setState('error', 'No puedo acceder a los datos del mercado en este momento.');
+      return;
+    }
+
+    if (data.msg_type === 'history' && data.history) {
+      var prices = data.history.prices || [];
+      var times = data.history.times || [];
+      var symbol = (data.echo_req && data.echo_req.ticks_history) || this.symbol;
+      if (symbol !== this.symbol) return; // respuesta de un mercado ya descartado
+      if (data.subscription) this.subscriptionId = data.subscription.id;
+
+      this.ticks = prices.map(function (p, i) {
+        return { time: Number(times[i]), price: Number(p) };
+      }).filter(function (t) { return isFinite(t.price) && isFinite(t.time); });
+
+      this.emit('history', { symbol: symbol, ticks: this.ticks.slice() });
+      return;
+    }
+
+    if (data.msg_type === 'tick' && data.tick) {
+      var t = data.tick;
+      if (t.symbol !== this.symbol) return;
+      if (data.subscription) this.subscriptionId = data.subscription.id;
+
+      var tick = { time: Number(t.epoch), price: Number(t.quote) };
+      if (!isFinite(tick.price)) return;
+
+      var last = this.ticks[this.ticks.length - 1];
+      if (last && last.time === tick.time) this.ticks[this.ticks.length - 1] = tick;
+      else this.ticks.push(tick);
+
+      if (this.ticks.length > CFG.historyCount * 2) {
+        this.ticks = this.ticks.slice(-CFG.historyCount);
+      }
+      this.emit('tick', { symbol: this.symbol, tick: tick, ticks: this.ticks });
+    }
+  };
+
+  /** Ticks disponibles del mercado activo (datos reales, puede estar vacío). */
+  MarketAPI.prototype.getMarketData = function () {
+    return {
+      symbol: this.symbol,
+      connected: this.isConnected(),
+      ticks: this.ticks.slice(),
+      lastPrice: this.ticks.length ? this.ticks[this.ticks.length - 1].price : null,
+      updatedAt: this.ticks.length ? this.ticks[this.ticks.length - 1].time : null
+    };
+  };
+
+  MarketAPI.prototype.hasEnoughData = function () {
+    return this.ticks.length >= TAI.CONFIG.MARKET.minTicksForAnalysis;
+  };
+
+  MarketAPI.prototype.disconnect = function () {
+    this.manualClose = true;
+    if (this.socket) this.socket.close();
+  };
+
+  TAI.MarketAPI = new MarketAPI();
+
+  /* Alias legibles solicitados en la arquitectura */
+  TAI.connectMarketAPI = function () { TAI.MarketAPI.connect(); };
+  TAI.subscribeMarket = function (symbol) { TAI.MarketAPI.subscribe(symbol); };
+  TAI.getMarketData = function () { return TAI.MarketAPI.getMarketData(); };
+})(window.TAI);
+
+/* ==== js/analysis-engine.js ==== */
+/**
+ * analysis-engine.js
+ * Motor de análisis puro: recibe ticks reales y devuelve métricas y un escenario.
+ * No habla con la red, no toca el DOM, no inventa precios.
+ *
+ * analyzeMarket({ symbol, ticks }) ->
+ *   { ok:false, reason:'INSUFFICIENT_DATA' }
+ *   { ok:true, market, direction, confidence, ticks, duration, trend, momentum, metrics, reason }
+ */
+(function (TAI) {
+  'use strict';
+
+  var MIN = TAI.CONFIG.MARKET.minTicksForAnalysis;
+
+  /* ----------------------------- utilidades ----------------------------- */
+
+  function mean(a) { return a.reduce(function (s, v) { return s + v; }, 0) / (a.length || 1); }
+
+  function stdev(a) {
+    if (a.length < 2) return 0;
+    var m = mean(a);
+    var v = a.reduce(function (s, x) { return s + (x - m) * (x - m); }, 0) / (a.length - 1);
+    return Math.sqrt(v);
+  }
+
+  function median(a) {
+    if (!a.length) return 0;
+    var s = a.slice().sort(function (x, y) { return x - y; });
+    var mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+  }
+
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+  /** Pendiente de regresión lineal de una serie (x = 0..n-1). */
+  function slope(series) {
+    var n = series.length;
+    if (n < 2) return 0;
+    var sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    for (var i = 0; i < n; i++) {
+      sumX += i; sumY += series[i]; sumXY += i * series[i]; sumXX += i * i;
+    }
+    var den = n * sumXX - sumX * sumX;
+    return den === 0 ? 0 : (n * sumXY - sumX * sumY) / den;
+  }
+
+  function ema(series, period) {
+    if (!series.length) return 0;
+    var k = 2 / (period + 1);
+    var e = series[0];
+    for (var i = 1; i < series.length; i++) e = series[i] * k + e * (1 - k);
+    return e;
+  }
+
+  /* ------------------------------ métricas ------------------------------ */
+
+  function computeMetrics(ticks) {
+    var prices = ticks.map(function (t) { return t.price; });
+    var times = ticks.map(function (t) { return t.time; });
+
+    var returns = [];
+    for (var i = 1; i < prices.length; i++) {
+      if (prices[i - 1]) returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+    }
+
+    var recentReturns = returns.slice(-60);
+    var volatility = stdev(recentReturns) * 100;            // % por tick
+    var baselineVol = stdev(returns.slice(-200, -60)) * 100 || volatility;
+
+    var window40 = prices.slice(-40);
+    var slope40 = slope(window40);
+    var priceSigma = stdev(window40) || 1e-9;
+    var trendZ = (slope40 * window40.length) / priceSigma;   // desplazamiento en sigmas
+
+    var last10 = prices.slice(-10);
+    var prev10 = prices.slice(-20, -10);
+    var rocFast = prev10.length ? (mean(last10) - mean(prev10)) / mean(prev10) * 100 : 0;
+    var momentumZ = volatility ? rocFast / volatility : 0;
+
+    var emaFast = ema(prices.slice(-30), 5);
+    var emaSlow = ema(prices.slice(-30), 20);
+    var emaSignal = emaSlow ? clamp(((emaFast - emaSlow) / emaSlow * 100) / (volatility || 1), -3, 3) : 0;
+
+    var last20 = returns.slice(-20);
+    var ups = last20.filter(function (r) { return r > 0; }).length;
+    var upRatio = last20.length ? ups / last20.length : 0.5;
+
+    // Racha de ticks consecutivos en la misma dirección
+    var streak = 0, streakDir = 0;
+    for (var j = returns.length - 1; j >= 0; j--) {
+      var dir = returns[j] > 0 ? 1 : returns[j] < 0 ? -1 : 0;
+      if (dir === 0) break;
+      if (streakDir === 0) { streakDir = dir; streak = 1; }
+      else if (dir === streakDir) streak++;
+      else break;
+    }
+
+    // Eficiencia de Kaufman: 1 = movimiento limpio, 0 = ruido lateral
+    var win = prices.slice(-50);
+    var net = Math.abs(win[win.length - 1] - win[0]);
+    var path = 0;
+    for (var k = 1; k < win.length; k++) path += Math.abs(win[k] - win[k - 1]);
+    var efficiency = path ? net / path : 0;
+
+    var hi = Math.max.apply(null, win);
+    var lo = Math.min.apply(null, win);
+    var rangePos = hi === lo ? 0.5 : (prices[prices.length - 1] - lo) / (hi - lo);
+
+    // Intervalo real entre ticks, medido de los datos
+    var deltas = [];
+    for (var m = 1; m < times.length; m++) {
+      var d = times[m] - times[m - 1];
+      if (d > 0 && d < 120) deltas.push(d);
+    }
+    var tickInterval = median(deltas) || 2;
+
+    return {
+      count: ticks.length,
+      lastPrice: prices[prices.length - 1],
+      changePct: prices.length > 1 ? (prices[prices.length - 1] - prices[0]) / prices[0] * 100 : 0,
+      volatility: volatility,
+      volatilityRatio: baselineVol ? volatility / baselineVol : 1,
+      trendZ: trendZ,
+      momentumZ: momentumZ,
+      emaSignal: emaSignal,
+      upRatio: upRatio,
+      streak: streak,
+      streakDir: streakDir,
+      efficiency: efficiency,
+      rangePos: rangePos,
+      tickInterval: tickInterval
+    };
+  }
+
+  /* --------------------------- interpretaciones --------------------------- */
+
+  function trendLabel(m) {
+    if (m.trendZ > 0.6 && m.efficiency > 0.18) return 'ALCISTA';
+    if (m.trendZ < -0.6 && m.efficiency > 0.18) return 'BAJISTA';
+    return 'LATERAL';
+  }
+
+  function momentumLabel(m) {
+    var mag = Math.abs(m.momentumZ);
+    if (mag > 1.2 || (mag > 0.7 && m.streak >= 4)) return 'ALTO';
+    if (mag > 0.45) return 'MEDIO';
+    return 'BAJO';
+  }
+
+  /** Régimen de volatilidad medido contra su propia línea base. */
+  function detectVolatility(ticks) {
+    if (!ticks || ticks.length < MIN) return { ok: false, reason: 'INSUFFICIENT_DATA' };
+    var m = computeMetrics(ticks);
+    var regime = m.volatilityRatio > 1.25 ? 'EXPANSIÓN'
+      : m.volatilityRatio < 0.8 ? 'COMPRESIÓN' : 'ESTABLE';
+    return {
+      ok: true,
+      regime: regime,
+      perTickPct: m.volatility,
+      ratio: m.volatilityRatio,
+      efficiency: m.efficiency
+    };
+  }
+
+  /** Horizonte en ticks coherente con volatilidad, momentum y limpieza del movimiento. */
+  function calculateTicks(m) {
+    var base = 3;
+    if (m.efficiency > 0.30) base -= 1;          // movimiento limpio: horizonte corto basta
+    if (m.efficiency < 0.12) base += 1;          // mucho ruido: se necesita más recorrido
+    if (momentumLabel(m) === 'ALTO') base -= 1;
+    if (momentumLabel(m) === 'BAJO') base += 1;
+    if (m.volatilityRatio > 1.3) base -= 1;      // expansión: el movimiento llega antes
+    return clamp(Math.round(base), 1, 5);
+  }
+
+  /** Escenario direccional a partir de señales ponderadas. */
+  function generatePrediction(m) {
+    var sTrend = clamp(Math.tanh(m.trendZ / 1.5), -1, 1);
+    var sMomentum = clamp(Math.tanh(m.momentumZ / 1.2), -1, 1);
+    var sBreadth = clamp((m.upRatio - 0.5) * 2.4, -1, 1);
+    var sEma = clamp(m.emaSignal / 2, -1, 1);
+
+    var score = 0.34 * sTrend + 0.28 * sMomentum + 0.20 * sBreadth + 0.18 * sEma;
+
+    // Penaliza desacuerdo entre señales: menos acuerdo, menos confianza
+    var signs = [sTrend, sMomentum, sBreadth, sEma].map(function (s) { return s > 0 ? 1 : s < 0 ? -1 : 0; });
+    var dominant = score >= 0 ? 1 : -1;
+    var agreement = signs.filter(function (s) { return s === dominant; }).length / signs.length;
+
+    var direction = score > 0.12 ? 'CALL' : score < -0.12 ? 'PUT' : 'WAIT';
+
+    var confidence = 50 + Math.abs(score) * 40 * agreement + (m.efficiency - 0.2) * 25;
+    confidence = Math.round(clamp(confidence, 45, 82));
+    if (direction === 'WAIT') confidence = Math.min(confidence, 55);
+
+    return { direction: direction, confidence: confidence, score: score, agreement: agreement };
+  }
+
+  function buildReason(m, pred, trend, momentum) {
+    var parts = [];
+    parts.push('Tendencia ' + trend.toLowerCase() + ' con momentum ' + momentum.toLowerCase());
+    parts.push('eficiencia del movimiento ' + (m.efficiency * 100).toFixed(0) + '%');
+    parts.push((m.upRatio * 100).toFixed(0) + '% de los últimos 20 ticks al alza');
+    if (m.streak >= 3) parts.push('racha de ' + m.streak + ' ticks ' + (m.streakDir > 0 ? 'al alza' : 'a la baja'));
+    parts.push('volatilidad por tick ' + m.volatility.toFixed(3) + '% (' + (m.volatilityRatio > 1.25 ? 'en expansión' : m.volatilityRatio < 0.8 ? 'comprimida' : 'estable') + ')');
+    if (pred.direction === 'WAIT') parts.push('las señales no coinciden lo suficiente para tomar dirección');
+    return parts.join('; ') + '.';
+  }
+
+  /* ------------------------------- API pública ------------------------------- */
+
+  function analyzeMarket(input) {
+    var ticks = (input && input.ticks) || [];
+    var symbolDef = TAI.getSymbol(input && input.symbol) || { label: input && input.symbol, code: input && input.symbol };
+
+    if (ticks.length < MIN) {
+      return {
+        ok: false,
+        reason: 'INSUFFICIENT_DATA',
+        available: ticks.length,
+        required: MIN,
+        market: symbolDef.label
+      };
+    }
+
+    var m = computeMetrics(ticks);
+    var trend = trendLabel(m);
+    var momentum = momentumLabel(m);
+    var pred = generatePrediction(m);
+    // Estructura lateral o movimiento muy ruidoso: la confianza no puede dispararse
+    if (trend === 'LATERAL') pred.confidence = Math.min(pred.confidence, 64);
+    if (m.efficiency < 0.10) pred.confidence = Math.min(pred.confidence, 58);
+
+    var recommendedTicks = calculateTicks(m);
+    var horizonSeconds = Math.max(1, Math.round(recommendedTicks * m.tickInterval));
+
+    return {
+      ok: true,
+      market: symbolDef.label,
+      symbol: symbolDef.code,
+      direction: pred.direction,
+      confidence: pred.confidence,
+      ticks: recommendedTicks,
+      duration: horizonSeconds,
+      trend: trend,
+      momentum: momentum,
+      lastPrice: m.lastPrice,
+      metrics: m,
+      reason: buildReason(m, pred, trend, momentum),
+      generatedAt: Date.now()
+    };
+  }
+
+  /**
+   * Sugiere un índice de volatilidad según lo medido en el mercado activo.
+   * Es una heurística sobre datos reales, no una certeza.
+   */
+  function recommendVolatility(symbol, ticks) {
+    var vol = detectVolatility(ticks);
+    if (!vol.ok) return { ok: false, reason: 'INSUFFICIENT_DATA' };
+
+    var current = TAI.getSymbol(symbol);
+    var all = TAI.CONFIG.MARKET.symbols;
+    var target;
+
+    if (vol.efficiency >= 0.25) {
+      target = current;                                   // movimiento limpio: quedarse aquí
+    } else if (vol.regime === 'EXPANSIÓN') {
+      target = all.filter(function (s) { return s.oneSecond === current.oneSecond && s.index < current.index; }).pop() || current;
+    } else {
+      target = all.filter(function (s) { return s.oneSecond === current.oneSecond && s.index > current.index; })[0] || current;
+    }
+
+    return {
+      ok: true,
+      current: current,
+      suggested: target,
+      regime: vol.regime,
+      efficiency: vol.efficiency,
+      perTickPct: vol.perTickPct,
+      sameMarket: target.code === current.code
+    };
+  }
+
+  TAI.AnalysisEngine = {
+    analyzeMarket: analyzeMarket,
+    detectVolatility: detectVolatility,
+    recommendVolatility: recommendVolatility,
+    calculateTicks: calculateTicks,
+    generatePrediction: generatePrediction,
+    computeMetrics: computeMetrics
+  };
+
+  TAI.analyzeMarket = analyzeMarket;
+})(window.TAI);
+
+/* ==== js/ai-engine.js ==== */
+/**
+ * ai-engine.js
+ * Capa de IA desacoplada del proveedor.
+ *
+ *   askTradingAI({ userQuestion, market, recentTicks, priceHistory, indicators, previousConversation })
+ *     -> Promise<{ intent, market, direction, confidence, ticks, duration, trend, momentum, reason, speech }>
+ *
+ * Proveedor 'LOCAL'  : razonamiento determinista sobre los ticks reales (analysis-engine.js).
+ * Proveedor 'PROXY'  : backend propio (la API key nunca vive en el frontend).
+ */
+(function (TAI) {
+  'use strict';
+
+  var CFG = TAI.CONFIG.AI;
+
+  var OFF_TOPIC_REPLY = 'Solo puedo responder o analizar mercados de trading. ¿Quieres analizar ahora?';
+
+  /* ----------------------------- normalización ----------------------------- */
+
+  function normalize(text) {
+    return (text || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[¿?¡!.,;:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  var TRADING_WORDS = [
+    'mercado', 'mercados', 'trading', 'trade', 'opera', 'operar', 'operacion', 'operaciones',
+    'analiza', 'analisis', 'analizar', 'analizame', 'analicemos', 'prediccion', 'predice', 'predecir',
+    'tendencia', 'momentum', 'volatilidad', 'volatility', 'tick', 'ticks', 'vela', 'velas',
+    'call', 'put', 'sube', 'subira', 'baja', 'bajara', 'alcista', 'bajista', 'lateral',
+    'precio', 'precios', 'grafico', 'indice', 'indices', 'sintetico', 'sinteticos',
+    'riesgo', 'entrada', 'salida', 'duracion', 'horizonte', 'señal', 'senal', 'escenario',
+    'estrategia', 'probabilidad', 'confianza', 'soporte', 'resistencia', 'rango', 'v10', 'v25',
+    'v50', 'v75', 'v100', 'deriv', 'digito', 'digitos', 'spread', 'apalancamiento'
+  ];
+
+  var AFFIRMATIVES = ['si', 'sii', 'claro', 'dale', 'ok', 'okay', 'vale', 'por supuesto', 'hazlo', 'adelante', 'otro', 'otra vez', 'de nuevo', 'repite', 'repitelo'];
+
+  function isTradingRelated(text) {
+    var n = normalize(text);
+    if (!n) return false;
+    if (detectMarket(n)) return true;
+    return TRADING_WORDS.some(function (w) { return n.indexOf(w) !== -1; });
+  }
+
+  /* ------------------------ detección de mercado ------------------------ */
+
+  function detectMarket(text) {
+    var n = normalize(text);
+    var indexMatch = n.match(/\b(?:volatility|volatilidad|indice|v)\s*-?\s*(10|25|50|75|100)\b/) ||
+                     n.match(/\b(10|25|50|75|100)\b(?=[^0-9]*(?:s|seg|segundo|tick|volatil|$))/);
+    if (!indexMatch) return null;
+
+    var index = Number(indexMatch[1]);
+    var oneSecond = /\b(1\s*s|1\s*seg|1\s*segundo|un\s*segundo|1hz|hz)\b/.test(n);
+
+    var match = TAI.CONFIG.MARKET.symbols.find(function (s) {
+      return s.index === index && s.oneSecond === oneSecond;
+    });
+    return match || null;
+  }
+
+  /* --------------------------- detección de intención --------------------------- */
+
+  function detectIntent(text) {
+    var n = normalize(text);
+
+    if (!n) return 'UNKNOWN';
+
+    if (/^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hey|que tal|que mas|como estas|como te va|quien eres)\b/.test(n)) return 'GREETING';
+    if (/^(gracias|muchas gracias|perfecto|genial|excelente|listo|vale)\b/.test(n) && n.length < 24) return 'THANKS';
+    if (/^(no|nada|ahora no|todavia no|luego|despues|mas tarde)\b/.test(n) && n.length < 20) return 'DECLINE';
+
+    if (/(analiza|analizar|analisis|analicemos).*(opera|operar|ejecuta|ejecutar|entra)/.test(n) ||
+        /(opera|ejecuta).*(analisis|analiza)/.test(n)) return 'ANALYZE_AND_EXECUTE';
+
+    if (/(cuantos|cuantas|que cantidad de|numero de).*(tick|ticks)/.test(n) ||
+        /\bticks?\b.*(recomiendas|deberia|uso|usar|conviene)/.test(n)) return 'RECOMMEND_TICKS';
+
+    if (/(que|cual|cuanta).*(volatilidad|volatility|indice).*(uso|usar|deberia|recomiendas|conviene|sirve|mejor)/.test(n) ||
+        /(recomienda|recomiendame|sugiere).*(volatilidad|indice|mercado)/.test(n)) return 'RECOMMEND_VOLATILITY';
+
+    if (/(subira|bajara|sube o baja|subir o bajar|va a subir|va a bajar|direccion|call o put|prediccion|predice|predecir|escenario)/.test(n)) return 'PREDICTION';
+
+    if (/(que esta haciendo|como esta|estado del mercado|como va|que pasa con).*(mercado|precio|grafico)?/.test(n) ||
+        /\b(resumen|estado)\b/.test(n)) return 'MARKET_STATE';
+
+    if (/(analiza|analizar|analisis|analizame|evalua|revisa|estudia)/.test(n)) return 'ANALYZE';
+
+    if (/(otro|otra|de nuevo|nuevamente|repite|repetir|hazlo otra vez)/.test(n)) return 'REPEAT';
+
+    if (AFFIRMATIVES.some(function (w) { return n === w || n.indexOf(w) === 0; })) return 'REPEAT';
+
+    if (/(riesgo|gestion|stake|cuanto arriesgo|money management)/.test(n)) return 'RISK';
+
+    if (/(ayuda|que puedes hacer|comandos|como funciona)/.test(n)) return 'HELP';
+
+    return isTradingRelated(n) ? 'MARKET_STATE' : 'OFF_TOPIC';
+  }
+
+  /* ----------------------------- redacción de voz ----------------------------- */
+
+  var DIRECTION_SPEECH = {
+    CALL: 'dirección probable al alza, escenario CALL',
+    PUT: 'dirección probable a la baja, escenario PUT',
+    WAIT: 'sin dirección clara, el escenario estimado es esperar'
+  };
+
+  function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  /** Pequeña variación para que no suene a grabación repetida. */
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+  var OPENERS = ['Listo, ya lo tengo.', 'Bien, esto es lo que veo.', 'Ya revisé los ticks.'];
+
+  function analysisSpeech(a) {
+    return pick(OPENERS) + ' Mercado ' + spokenMarket(a.market) + '. ' +
+      capitalize(DIRECTION_SPEECH[a.direction]) + ', con una confianza estimada del ' + a.confidence + ' por ciento. ' +
+      'Tendencia ' + a.trend.toLowerCase() + ' y momentum ' + a.momentum.toLowerCase() + '. ' +
+      'Para este escenario usaría un horizonte de ' + a.ticks + (a.ticks === 1 ? ' tick' : ' ticks') +
+      ', aproximadamente ' + a.duration + ' segundos.';
+  }
+
+  function spokenMarket(label) {
+    return String(label || '').replace('(1s)', '1 segundo');
+  }
+
+  /* ------------------------------ proveedor LOCAL ------------------------------ */
+
+  function localProvider(ctx) {
+    var intent = ctx.intent;
+    var ticks = ctx.priceHistory || [];
+    var symbol = ctx.market;
+
+    if (intent === 'OFF_TOPIC') {
+      return { intent: 'off_topic', speech: OFF_TOPIC_REPLY, text: OFF_TOPIC_REPLY };
+    }
+
+    if (intent === 'GREETING') {
+      var hi = pick([
+        'Hola, muy bien, gracias. Estoy lista para leer el mercado. ¿Quieres que analice ' + spokenMarket((TAI.getSymbol(symbol) || {}).label) + '?',
+        'Hola, todo en orden por aquí. Tengo los ticks entrando en vivo. ¿Arrancamos con un análisis?',
+        'Hola, qué gusto. Puedo analizar cualquier índice de volatilidad. ¿Con cuál empezamos?'
+      ]);
+      return { intent: 'greeting', speech: hi, text: hi };
+    }
+
+    if (intent === 'THANKS') {
+      var th = pick([
+        'Con gusto. ¿Hacemos otro análisis?',
+        'Para eso estoy. ¿Quieres que revise otro índice?',
+        'Cuando quieras. Dime el mercado y lo analizo.'
+      ]);
+      return { intent: 'thanks', speech: th, text: th };
+    }
+
+    if (intent === 'DECLINE') {
+      var no = pick([
+        'Perfecto, me quedo atenta. Cuando quieras dime «analiza» y sigo.',
+        'Sin problema. Aquí sigo leyendo el mercado por si cambias de idea.'
+      ]);
+      return { intent: 'decline', speech: no, text: no };
+    }
+
+    if (intent === 'HELP') {
+      var help = 'Puedo analizar los índices de volatilidad, estimar dirección, recomendar volatilidad y horizonte en ticks. Di por ejemplo: analiza Volatility 75 1 segundo.';
+      return { intent: 'help', speech: help, text: help };
+    }
+
+    if (intent === 'RISK') {
+      var risk = 'Gestión del riesgo: arriesga un porcentaje fijo y pequeño por operación, evita aumentar el tamaño tras una pérdida y limita el número de operaciones seguidas. Ninguna predicción elimina el riesgo.';
+      return { intent: 'risk', speech: risk, text: risk };
+    }
+
+    var analysis = TAI.AnalysisEngine.analyzeMarket({ symbol: symbol, ticks: ticks });
+
+    if (!analysis.ok) {
+      var msg = 'No hay suficientes datos para realizar un análisis confiable. Necesito más ticks del mercado.';
+      return { intent: 'insufficient_data', speech: msg, text: msg, analysis: analysis };
+    }
+
+    if (intent === 'RECOMMEND_TICKS') {
+      var t = 'Para este escenario utilizaría ' + analysis.ticks + (analysis.ticks === 1 ? ' tick' : ' ticks') +
+        ' como horizonte de análisis, unos ' + analysis.duration + ' segundos, según el momentum ' +
+        analysis.momentum.toLowerCase() + ' medido ahora. Es una estimación, no una certeza.';
+      return buildResult('recommend_ticks', analysis, t);
+    }
+
+    if (intent === 'RECOMMEND_VOLATILITY') {
+      var rec = TAI.AnalysisEngine.recommendVolatility(symbol, ticks);
+      var v;
+      if (!rec.ok) {
+        v = 'No hay suficientes datos para recomendar una volatilidad.';
+        return { intent: 'insufficient_data', speech: v, text: v };
+      }
+      v = rec.sameMarket
+        ? 'Según los datos actuales me quedaría en ' + spokenMarket(rec.current.label) + '. La volatilidad está en ' + rec.regime.toLowerCase() + ' y el movimiento es suficientemente limpio.'
+        : 'Según los datos actuales consideraría ' + spokenMarket(rec.suggested.label) + '. En ' + spokenMarket(rec.current.label) + ' la volatilidad está en ' + rec.regime.toLowerCase() + ' y el movimiento es ruidoso.';
+      var out = buildResult('recommend_volatility', analysis, v);
+      out.suggestedMarket = rec.suggested;
+      return out;
+    }
+
+    if (intent === 'MARKET_STATE') {
+      var s = 'En ' + spokenMarket(analysis.market) + ' la tendencia es ' + analysis.trend.toLowerCase() +
+        ' con momentum ' + analysis.momentum.toLowerCase() + '. Volatilidad por tick ' +
+        analysis.metrics.volatility.toFixed(3) + ' por ciento.';
+      return buildResult('market_state', analysis, s);
+    }
+
+    if (intent === 'PREDICTION') {
+      var p = 'Según los datos actuales, ' + DIRECTION_SPEECH[analysis.direction] +
+        ', con una confianza estimada del ' + analysis.confidence + ' por ciento.';
+      return buildResult('prediction', analysis, p);
+    }
+
+    // ANALYZE, ANALYZE_AND_EXECUTE, REPEAT
+    var kind = intent === 'ANALYZE_AND_EXECUTE' ? 'analyze_and_execute' : 'market_analysis';
+    return buildResult(kind, analysis, analysisSpeech(analysis));
+  }
+
+  function buildResult(intent, analysis, speech) {
+    return {
+      intent: intent,
+      market: analysis.market,
+      symbol: analysis.symbol,
+      direction: analysis.direction,
+      confidence: analysis.confidence,
+      ticks: analysis.ticks,
+      duration: analysis.duration,
+      trend: analysis.trend.toLowerCase(),
+      momentum: analysis.momentum.toLowerCase(),
+      reason: analysis.reason,
+      speech: speech,
+      text: speech,
+      analysis: analysis
+    };
+  }
+
+  /* ------------------------------ proveedor PROXY ------------------------------ */
+
+  function proxyProvider(ctx) {
+    if (!CFG.proxyUrl) return Promise.reject(new Error('AI.proxyUrl no configurado'));
+
+    var payload = {
+      userQuestion: ctx.userQuestion,
+      intent: ctx.intent,
+      market: ctx.market,
+      marketLabel: (TAI.getSymbol(ctx.market) || {}).label,
+      recentTicks: (ctx.recentTicks || []).slice(-CFG.maxContextTicks),
+      indicators: ctx.indicators || null,
+      previousConversation: (ctx.previousConversation || []).slice(-8),
+      simulationMode: TAI.CONFIG.APP.simulationMode
+    };
+
+    return fetch(CFG.proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      if (!res.ok) throw new Error('Proxy HTTP ' + res.status);
+      return res.json();
+    }).then(function (data) {
+      if (!data || typeof data !== 'object' || !data.intent) throw new Error('Respuesta de IA inválida');
+      data.speech = data.speech || data.reason || data.text || '';
+      data.text = data.text || data.speech;
+      return data;
+    });
+  }
+
+  /* ------------------------------- API pública ------------------------------- */
+
+  /**
+   * @param {Object} context { userQuestion, market, recentTicks, priceHistory, indicators, previousConversation }
+   * @returns {Promise<Object>} respuesta estructurada
+   */
+  function askTradingAI(context) {
+    var ctx = context || {};
+    ctx.intent = ctx.intent || detectIntent(ctx.userQuestion);
+
+    if (ctx.intent === 'OFF_TOPIC') {
+      // La restricción temática se aplica siempre en local, sin gastar el proveedor externo.
+      return Promise.resolve(localProvider(ctx));
+    }
+
+    if (CFG.provider === 'PROXY') {
+      return proxyProvider(ctx).catch(function (err) {
+        console.warn('[AI] proxy falló:', err.message);
+        if (!CFG.fallbackToLocal) {
+          var m = 'No puedo contactar con el motor de IA en este momento.';
+          return { intent: 'error', speech: m, text: m };
+        }
+        return localProvider(ctx);
+      });
+    }
+
+    return Promise.resolve(localProvider(ctx));
+  }
+
+  TAI.AIEngine = {
+    askTradingAI: askTradingAI,
+    detectIntent: detectIntent,
+    detectMarket: detectMarket,
+    isTradingRelated: isTradingRelated,
+    normalize: normalize,
+    OFF_TOPIC_REPLY: OFF_TOPIC_REPLY,
+    spokenMarket: spokenMarket
+  };
+
+  TAI.askTradingAI = askTradingAI;
+})(window.TAI);
+
+/* ==== js/voice.js ==== */
+/**
+ * voice.js
+ * Reconocimiento de voz (Web Speech API) + síntesis (SpeechSynthesis).
+ * El micrófono funciona como interruptor: un clic escucha, otro clic detiene.
+ *
+ * Eventos: 'start', 'interim'({text}), 'final'({text}), 'end', 'error'({message}),
+ *          'speakstart'({text}), 'speakend'
+ */
+(function (TAI) {
+  'use strict';
+
+  var APP = TAI.CONFIG.APP;
+
+  function Voice() {
+    this._handlers = {};
+    this.listening = false;
+    this.speaking = false;
+    this.recognition = null;
+    this.supported = false;
+    this._finalText = '';
+    this._stopRequested = false;
+    this._speakToken = 0;
+    this._voiceCache = null;
+    this._permission = null;
+    this._stream = null;
+    this.permissionGranted = false;
+    this.muted = false;
+    this._ignoreUntil = 0;
+    this._init();
+  }
+
+  Voice.prototype.on = function (evt, cb) {
+    (this._handlers[evt] = this._handlers[evt] || []).push(cb);
+    return this;
+  };
+  Voice.prototype.emit = function (evt, payload) {
+    (this._handlers[evt] || []).forEach(function (cb) {
+      try { cb(payload); } catch (e) { console.error('[Voice]', evt, e); }
+    });
+  };
+
+  Voice.prototype._init = function () {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { this.supported = false; return; }
+    this.supported = true;
+
+    var rec = new SR();
+    rec.lang = APP.lang;
+    // Sesión continua: el motor no se reinicia entre frases, así el navegador
+    // pide el permiso del micrófono UNA sola vez.
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    var self = this;
+
+    rec.onstart = function () {
+      self.listening = true;
+      self._finalText = '';
+      self.emit('start');
+    };
+
+    rec.onresult = function (event) {
+      // Mientras la IA habla, lo que entra por el micrófono es su propio audio
+      if (self.muted || Date.now() < self._ignoreUntil) return;
+
+      var interim = '';
+      var finalText = '';
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var res = event.results[i];
+        if (res.isFinal) finalText += res[0].transcript + ' ';
+        else interim += res[0].transcript;
+      }
+
+      if (interim) self.emit('interim', { text: interim.trim() });
+      if (finalText.trim()) {
+        self.emit('interim', { text: finalText.trim() });
+        self.emit('final', { text: finalText.trim() });
+      }
+    };
+
+    rec.onerror = function (event) {
+      var map = {
+        'not-allowed': 'No puedo acceder al micrófono. Revisa los permisos del navegador.',
+        'service-not-allowed': 'No puedo acceder al micrófono. Revisa los permisos del navegador.',
+        'audio-capture': 'No detecto ningún micrófono disponible.',
+        'network': 'El reconocimiento de voz necesita conexión a internet.',
+        'no-speech': 'No escuché nada. Vuelve a pulsar el micrófono.',
+        'aborted': ''
+      };
+      var message = map[event.error];
+      if (message === undefined) message = 'El reconocimiento de voz falló (' + event.error + ').';
+      if (message) self.emit('error', { message: message, code: event.error });
+    };
+
+    rec.onend = function () {
+      self.listening = false;
+      self._finalText = '';
+      self.emit('end');
+    };
+
+    this.recognition = rec;
+  };
+
+  /**
+   * Pide el permiso del micrófono UNA sola vez y lo deja concedido para el origen.
+   * Devuelve una promesa con true/false. Si el navegador no expone mediaDevices
+   * (http sin TLS), se delega en el propio SpeechRecognition.
+   */
+  Voice.prototype.ensurePermission = function () {
+    var self = this;
+    if (this.permissionGranted) return Promise.resolve(true);
+    if (this._permission) return this._permission;
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      this.permissionGranted = true;
+      this._permission = Promise.resolve(true);
+      return this._permission;
+    }
+
+    // 1) ¿El navegador ya lo tiene concedido de una sesión anterior?
+    var preflight = Promise.resolve(null);
+    if (navigator.permissions && navigator.permissions.query) {
+      preflight = navigator.permissions.query({ name: 'microphone' })
+        .then(function (st) { return st.state; })
+        .catch(function () { return null; });
+    }
+
+    this._permission = preflight.then(function () {
+      return navigator.mediaDevices.getUserMedia({ audio: true });
+    })
+      .then(function (stream) {
+        // El stream se MANTIENE abierto durante toda la conversación:
+        // mientras exista, el navegador no vuelve a preguntar por el micrófono.
+        self._stream = stream;
+        self.permissionGranted = true;
+        try { localStorage.setItem('tai.mic', 'granted'); } catch (e) { /* noop */ }
+        return true;
+      })
+      .catch(function (err) {
+        self.permissionGranted = false;
+        self._permission = null;         // permite reintentar tras conceder el permiso
+        self.emit('error', {
+          message: err && err.name === 'NotAllowedError'
+            ? 'No me diste permiso para usar el micrófono. Actívalo en el candado de la barra de direcciones.'
+            : 'No puedo acceder al micrófono.',
+          code: 'permission'
+        });
+        return false;
+      });
+
+    return this._permission;
+  };
+
+  /** Libera el micrófono por completo (solo al cerrar la conversación). */
+  Voice.prototype.releaseMicrophone = function () {
+    if (this._stream) {
+      this._stream.getTracks().forEach(function (t) { t.stop(); });
+      this._stream = null;
+    }
+  };
+
+  /** Silencia la entrada sin cerrar la sesión (evita volver a pedir permiso). */
+  Voice.prototype.mute = function (on) {
+    this.muted = !!on;
+    if (!on) this._ignoreUntil = Date.now() + 350;   // margen para la cola del altavoz
+  };
+
+  /** Alterna entre escuchar y detener. */
+  Voice.prototype.toggleListening = function () {
+    if (this.listening) this.stopListening();
+    else this.startListening();
+  };
+
+  Voice.prototype.startListening = function (options) {
+    var self = this;
+    if (!this.supported) {
+      this.emit('error', { message: 'El reconocimiento de voz no está disponible en este navegador.', code: 'unsupported' });
+      return false;
+    }
+    if (this.listening) return true;
+
+    // Primera vez: se pide permiso y se arranca cuando el usuario lo concede
+    if (!this.permissionGranted && (!options || !options.skipPermission)) {
+      this.ensurePermission().then(function (ok) {
+        if (ok) self.startListening({ skipPermission: true });
+      });
+      return true;
+    }
+
+    this.muted = false;
+    if (!options || !options.keepSpeech) this.cancelSpeech();
+    try {
+      this.recognition.lang = APP.lang;
+      this.recognition.start();
+      return true;
+    } catch (err) {
+      // start() lanza si la sesión anterior sigue viva: se reintenta en breve
+      var self2 = this;
+      setTimeout(function () {
+        if (!self2.listening) {
+          try { self2.recognition.start(); } catch (e2) { /* noop */ }
+        }
+      }, 400);
+      return true;
+    }
+  };
+
+  Voice.prototype.stopListening = function () {
+    if (!this.supported || !this.listening) return;
+    try { this.recognition.stop(); } catch (e) { /* noop */ }
+  };
+
+  /* ------------------------------ síntesis de voz ------------------------------ */
+
+  /* ---------------------- selección de voz femenina ---------------------- */
+
+  var FEMALE_HINTS = [
+    'monica', 'mónica', 'paulina', 'sabina', 'helena', 'laura', 'esperanza', 'luciana',
+    'elvira', 'marisol', 'lucia', 'lucía', 'camila', 'ximena', 'carmen', 'isabela',
+    'catalina', 'maria', 'maría', 'penelope', 'penélope', 'conchita', 'lupe',
+    'dalia', 'salome', 'salomé', 'renata', 'valentina', 'sofia', 'sofía', 'emilia',
+    'paloma', 'marina', 'tania', 'larissa', 'elena', 'nuria', 'triana', 'lia', 'yaret',
+    'female', 'mujer'
+  ];
+  var MALE_HINTS = ['jorge', 'diego', 'carlos', 'juan', 'pablo', 'raul', 'raúl', 'enrique', 'miguel', 'male', 'hombre', 'andres', 'andrés'];
+  var LANG_BONUS = { 'es-co': 30, 'es-mx': 28, 'es-us': 24, 'es-419': 24, 'es-ar': 20, 'es-cl': 20, 'es-pe': 20, 'es-es': 16, 'es': 12 };
+
+  function scoreVoice(v) {
+    var name = (v.name || '').toLowerCase();
+    var lang = (v.lang || '').toLowerCase().replace('_', '-');
+    if (lang.indexOf('es') !== 0) return -Infinity;
+
+    var score = 0;
+    Object.keys(LANG_BONUS).forEach(function (key) {
+      if (lang.indexOf(key) === 0 && LANG_BONUS[key] > score) score = LANG_BONUS[key];
+    });
+
+    if (FEMALE_HINTS.some(function (h) { return name.indexOf(h) !== -1; })) score += 45;
+    else if (MALE_HINTS.some(function (h) { return name.indexOf(h) !== -1; })) score -= 60;
+
+    // Voces neuronales: bastante menos metálicas que las locales clásicas
+    if (name.indexOf('natural') !== -1 || name.indexOf('neural') !== -1) score += 42;
+    if (name.indexOf('online') !== -1) score += 12;
+    if (name.indexOf('google') !== -1) score += 18;
+    if (name.indexOf('premium') !== -1 || name.indexOf('enhanced') !== -1) score += 14;
+    if (name.indexOf('compact') !== -1 || name.indexOf('eloquence') !== -1) score -= 25;
+
+    return score;
+  }
+
+  Voice.prototype._pickVoice = function () {
+    if (!window.speechSynthesis) return null;
+    var voices = window.speechSynthesis.getVoices() || [];
+    if (!voices.length) return null;
+    if (this._voiceCache && voices.indexOf(this._voiceCache) !== -1) return this._voiceCache;
+
+    var best = null, bestScore = -Infinity;
+    voices.forEach(function (v) {
+      var s = scoreVoice(v);
+      if (s > bestScore) { bestScore = s; best = v; }
+    });
+
+    this._voiceCache = bestScore === -Infinity ? null : best;
+    return this._voiceCache;
+  };
+
+  /** Voz elegida, útil para depurar en consola. */
+  Voice.prototype.currentVoice = function () {
+    var v = this._pickVoice();
+    return v ? v.name + ' (' + v.lang + ')' : 'voz por defecto del sistema';
+  };
+
+  /* --------------------------- habla encadenada --------------------------- */
+
+  /** Divide en frases: las pausas naturales entre ellas quitan el tono de robot. */
+  function splitSentences(text) {
+    var matches = String(text).match(/[^.?!]+[.?!]*/g) || [String(text)];
+    return matches.map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
+  Voice.prototype._speakChunk = function (text, opts) {
+    var self = this;
+    return new Promise(function (resolve) {
+      var utter = new SpeechSynthesisUtterance(text);
+      var voice = self._pickVoice();
+      if (voice) utter.voice = voice;
+      utter.lang = (voice && voice.lang) || APP.lang;
+      utter.rate = opts.rate || APP.speechRate;
+      utter.pitch = opts.pitch || APP.speechPitch;
+      utter.volume = opts.volume == null ? 1 : opts.volume;
+
+      var done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        clearTimeout(guard);
+        resolve();
+      }
+      utter.onend = finish;
+      utter.onerror = finish;
+
+      // Salvaguarda: algunos navegadores móviles no disparan onend
+      var guard = setTimeout(finish, Math.min(30000, 2200 + text.length * 95));
+      window.speechSynthesis.speak(utter);
+    });
+  };
+
+  /**
+   * Habla un texto frase a frase. Devuelve una promesa que resuelve al terminar.
+   * Nunca rechaza: si la síntesis no está disponible, resuelve de inmediato.
+   */
+  Voice.prototype.speak = function (text, options) {
+    var self = this;
+    var opts = options || {};
+    if (!text) return Promise.resolve();
+
+    if (!('speechSynthesis' in window)) {
+      this.emit('speakstart', { text: text });
+      this.emit('speakend');
+      return Promise.resolve();
+    }
+
+    if (!opts.queue) window.speechSynthesis.cancel();
+
+    var chunks = splitSentences(text);
+    var token = ++this._speakToken;
+    this.speaking = true;
+    this.emit('speakstart', { text: text });
+
+    return chunks.reduce(function (chain, chunk, i) {
+      return chain.then(function () {
+        if (token !== self._speakToken) return null;       // llegó un speak/cancel posterior
+        return self._speakChunk(chunk, opts).then(function () {
+          if (i < chunks.length - 1) return new Promise(function (r) { setTimeout(r, 140); });
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      if (token !== self._speakToken) return;
+      self.speaking = false;
+      self.emit('speakend');
+    });
+  };
+
+  Voice.prototype.cancelSpeech = function () {
+    this._speakToken++;                    // invalida cualquier cadena de frases en curso
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (this.speaking) { this.speaking = false; this.emit('speakend'); }
+  };
+
+  /** Desbloquea la síntesis en iOS/Safari: debe llamarse dentro de un gesto del usuario. */
+  Voice.prototype.unlock = function () {
+    if (!('speechSynthesis' in window) || this._unlocked) return;
+    try {
+      var u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
+      this._unlocked = true;
+    } catch (e) { /* noop */ }
+  };
+
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = function () {
+      if (TAI.Voice) TAI.Voice._voiceCache = null;   // reevalúa cuando el sistema carga las voces
+    };
+  }
+
+  TAI.Voice = new Voice();
+
+  TAI.startListening = function (o) { return TAI.Voice.startListening(o); };
+  TAI.stopListening = function () { return TAI.Voice.stopListening(); };
+  TAI.speakAI = function (text, opts) { return TAI.Voice.speak(text, opts); };
+})(window.TAI);
+
+/* ==== js/countdown.js ==== */
+/**
+ * countdown.js
+ * Cuenta regresiva basada en reloj real (Date.now), no en una animación.
+ * Se mantiene sincronizada aunque la interfaz se repinte o la pestaña se pause.
+ */
+(function (TAI) {
+  'use strict';
+
+  function Countdown() {
+    this.timer = null;
+    this.endAt = 0;
+    this.total = 0;
+    this.running = false;
+    this._onTick = null;
+    this._onDone = null;
+  }
+
+  /**
+   * @param {Object} opts { seconds, onTick(remainingInt, progress0a1), onDone() }
+   */
+  Countdown.prototype.start = function (opts) {
+    var o = opts || {};
+    this.stop();
+    this.total = o.seconds || TAI.CONFIG.APP.countdownSeconds;
+    this.endAt = Date.now() + this.total * 1000;
+    this._onTick = o.onTick || null;
+    this._onDone = o.onDone || null;
+    this.running = true;
+
+    var self = this;
+    function frame() {
+      var remainingMs = self.endAt - Date.now();
+      var remaining = Math.max(0, Math.ceil(remainingMs / 1000));
+      var progress = 1 - Math.max(0, Math.min(1, remainingMs / (self.total * 1000)));
+
+      if (self._onTick) self._onTick(remaining, progress);
+
+      if (remainingMs <= 0) {
+        self.running = false;
+        clearInterval(self.timer);
+        self.timer = null;
+        if (self._onDone) self._onDone();
+      }
+    }
+
+    frame();
+    this.timer = setInterval(frame, 100);   // 100 ms: números estables sin deriva
+    return this;
+  };
+
+  Countdown.prototype.stop = function () {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    this.running = false;
+  };
+
+  Countdown.prototype.remaining = function () {
+    return this.running ? Math.max(0, Math.ceil((this.endAt - Date.now()) / 1000)) : 0;
+  };
+
+  TAI.Countdown = new Countdown();
+  TAI.startCountdown = function (opts) { return TAI.Countdown.start(opts); };
+})(window.TAI);
+
+/* ==== js/chart.js ==== */
+/**
+ * chart.js
+ * Gráfico de precio en vivo.
+ *
+ * Motor principal: TradingView Lightweight Charts (librería oficial de TradingView),
+ * alimentada con los ticks REALES del WebSocket de Deriv.
+ *
+ * Nota: el widget de tradingview.com no publica los índices sintéticos de Deriv
+ * (Volatility 10/25/50/75/100), así que incrustarlo mostraría un activo distinto
+ * del que analiza la IA. Por eso se usa su librería de gráficos con nuestros datos.
+ *
+ * Respaldo: si la librería no carga (sin internet o CDN bloqueado), se dibuja el
+ * mismo gráfico en un <canvas> propio para que la app nunca se quede sin gráfico.
+ */
+(function (TAI) {
+  'use strict';
+
+  var COLORS = {
+    up: '#2ee6a8',
+    down: '#ff5a76',
+    flat: '#8ea0bd',
+    grid: 'rgba(255,255,255,0.05)',
+    axis: 'rgba(255,255,255,0.35)'
+  };
+
+  /* ===================== motor TradingView Lightweight ===================== */
+
+  function TVChart(container) {
+    this.container = container;
+    this.decimals = 3;
+    this.lastTime = 0;
+    this.firstPrice = null;
+
+    this.chart = window.LightweightCharts.createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
+      layout: {
+        background: { type: 'solid', color: 'transparent' },
+        textColor: COLORS.axis,
+        fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+        fontSize: 11
+      },
+      grid: {
+        vertLines: { color: COLORS.grid },
+        horzLines: { color: COLORS.grid }
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(148,178,255,0.12)',
+        scaleMargins: { top: 0.14, bottom: 0.12 }
+      },
+      timeScale: {
+        borderColor: 'rgba(148,178,255,0.12)',
+        timeVisible: true,
+        secondsVisible: true,
+        rightOffset: 4
+      },
+      crosshair: {
+        mode: 0,
+        vertLine: { color: 'rgba(139,107,255,0.5)', width: 1, style: 2, labelBackgroundColor: '#8b6bff' },
+        horzLine: { color: 'rgba(139,107,255,0.5)', width: 1, style: 2, labelBackgroundColor: '#8b6bff' }
+      },
+      handleScale: { axisPressedMouseMove: false },
+      localization: { locale: 'es-CO' }
+    });
+
+    this.series = this.chart.addAreaSeries({
+      lineColor: COLORS.up,
+      lineWidth: 2,
+      topColor: 'rgba(46,230,168,0.28)',
+      bottomColor: 'rgba(46,230,168,0.02)',
+      priceLineColor: COLORS.up,
+      crosshairMarkerBackgroundColor: '#05080f',
+      priceFormat: { type: 'price', precision: this.decimals, minMove: Math.pow(10, -this.decimals) }
+    });
+
+    var self = this;
+    this._onResize = function () {
+      self.chart.applyOptions({ width: self.container.clientWidth, height: self.container.clientHeight });
+    };
+    window.addEventListener('resize', this._onResize);
+    window.addEventListener('orientationchange', this._onResize);
+    if (window.ResizeObserver) {
+      this._ro = new ResizeObserver(this._onResize);
+      this._ro.observe(container);
+    }
+  }
+
+  TVChart.prototype._recolor = function (lastPrice) {
+    if (this.firstPrice == null || lastPrice == null) return;
+    var rising = lastPrice >= this.firstPrice;
+    this.series.applyOptions({
+      lineColor: rising ? COLORS.up : COLORS.down,
+      topColor: rising ? 'rgba(46,230,168,0.28)' : 'rgba(255,90,118,0.28)',
+      bottomColor: rising ? 'rgba(46,230,168,0.02)' : 'rgba(255,90,118,0.02)',
+      priceLineColor: rising ? COLORS.up : COLORS.down
+    });
+  };
+
+  TVChart.prototype.setData = function (ticks, decimals) {
+    if (typeof decimals === 'number' && decimals !== this.decimals) {
+      this.decimals = decimals;
+      this.series.applyOptions({
+        priceFormat: { type: 'price', precision: decimals, minMove: Math.pow(10, -decimals) }
+      });
+    }
+
+    // Lightweight Charts exige tiempos estrictamente ascendentes y únicos
+    var list = ticks || [];
+    var seen = Object.create(null);
+    for (var i = 0; i < list.length; i++) seen[list[i].time] = list[i].price;
+
+    var data = Object.keys(seen).map(Number).sort(function (a, b) { return a - b; })
+      .map(function (t) { return { time: t, value: seen[t] }; });
+
+    this.series.setData(data);
+    this.lastTime = data.length ? data[data.length - 1].time : 0;
+    this.firstPrice = data.length ? data[0].value : null;
+    this._recolor(data.length ? data[data.length - 1].value : null);
+    if (data.length) this.chart.timeScale().scrollToRealTime();
+  };
+
+  TVChart.prototype.push = function (tick) {
+    if (!tick || tick.time < this.lastTime) return;
+    if (this.firstPrice == null) this.firstPrice = tick.price;
+    this.series.update({ time: tick.time, value: tick.price });
+    this.lastTime = tick.time;
+    this._recolor(tick.price);
+  };
+
+  /* ======================= respaldo en canvas propio ======================= */
+
+  function TickChart(container) {
+    var canvas = document.createElement('canvas');
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.display = 'block';
+    canvas.setAttribute('aria-label', 'Gráfico de ticks en vivo');
+    container.appendChild(canvas);
+
+    this.container = container;
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.ticks = [];
+    this.decimals = 3;
+    this.visible = 120;
+    this._raf = null;
+    this._bind();
+  }
+
+  TickChart.prototype._bind = function () {
+    var self = this;
+    this._onResize = function () { self.resize(); self.draw(); };
+    window.addEventListener('resize', this._onResize);
+    window.addEventListener('orientationchange', this._onResize);
+    this.resize();
+  };
+
+  TickChart.prototype.resize = function () {
+    var dpr = window.devicePixelRatio || 1;
+    var rect = this.canvas.getBoundingClientRect();
+    this.width = Math.max(200, rect.width);
+    this.height = Math.max(140, rect.height);
+    this.canvas.width = Math.round(this.width * dpr);
+    this.canvas.height = Math.round(this.height * dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+
+  TickChart.prototype.setData = function (ticks, decimals) {
+    this.ticks = ticks || [];
+    if (typeof decimals === 'number') this.decimals = decimals;
+    this.requestDraw();
+  };
+
+  TickChart.prototype.push = function (tick) {
+    this.ticks.push(tick);
+    if (this.ticks.length > 600) this.ticks = this.ticks.slice(-400);
+    this.requestDraw();
+  };
+
+  TickChart.prototype.requestDraw = function () {
+    var self = this;
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(function () {
+      self._raf = null;
+      self.draw();
+    });
+  };
+
+  TickChart.prototype.formatPrice = function (p) {
+    return Number(p).toFixed(this.decimals);
+  };
+
+  TickChart.prototype.draw = function () {
+    var ctx = this.ctx;
+    var W = this.width, H = this.height;
+    ctx.clearRect(0, 0, W, H);
+
+    var data = this.ticks.slice(-this.visible);
+    if (data.length < 2) {
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.font = '13px "Space Grotesk", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Esperando datos del mercado…', W / 2, H / 2);
+      return;
+    }
+
+    var padRight = 62, padTop = 14, padBottom = 22, padLeft = 6;
+    var plotW = W - padRight - padLeft;
+    var plotH = H - padTop - padBottom;
+
+    var prices = data.map(function (d) { return d.price; });
+    var min = Math.min.apply(null, prices);
+    var max = Math.max.apply(null, prices);
+    if (max === min) { max += 0.5; min -= 0.5; }
+    var pad = (max - min) * 0.12;
+    min -= pad; max += pad;
+
+    var x = function (i) { return padLeft + (i / (data.length - 1)) * plotW; };
+    var y = function (p) { return padTop + (1 - (p - min) / (max - min)) * plotH; };
+
+    // Rejilla + escala de precios
+    ctx.font = '11px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    for (var g = 0; g <= 4; g++) {
+      var py = padTop + (plotH * g) / 4;
+      ctx.strokeStyle = COLORS.grid;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padLeft, py + 0.5);
+      ctx.lineTo(padLeft + plotW, py + 0.5);
+      ctx.stroke();
+      var pv = max - ((max - min) * g) / 4;
+      ctx.fillStyle = COLORS.axis;
+      ctx.fillText(this.formatPrice(pv), padLeft + plotW + 8, py + 4);
+    }
+
+    var rising = data[data.length - 1].price >= data[0].price;
+    var lineColor = rising ? COLORS.up : COLORS.down;
+
+    // Área bajo la curva
+    var grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
+    grad.addColorStop(0, rising ? 'rgba(46,230,168,0.28)' : 'rgba(255,90,118,0.28)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    ctx.beginPath();
+    ctx.moveTo(x(0), y(data[0].price));
+    for (var i = 1; i < data.length; i++) ctx.lineTo(x(i), y(data[i].price));
+    ctx.lineTo(x(data.length - 1), padTop + plotH);
+    ctx.lineTo(x(0), padTop + plotH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Línea de precio
+    ctx.beginPath();
+    ctx.moveTo(x(0), y(data[0].price));
+    for (var j = 1; j < data.length; j++) ctx.lineTo(x(j), y(data[j].price));
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 1.8;
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = rising ? 'rgba(46,230,168,0.5)' : 'rgba(255,90,118,0.5)';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Último precio
+    var last = data[data.length - 1];
+    var lx = x(data.length - 1), ly = y(last.price);
+
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.beginPath();
+    ctx.moveTo(padLeft, ly + 0.5);
+    ctx.lineTo(padLeft + plotW, ly + 0.5);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = lineColor;
+    ctx.beginPath();
+    ctx.arc(lx, ly, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    var label = this.formatPrice(last.price);
+    ctx.font = '600 11px ui-monospace, "JetBrains Mono", monospace';
+    var tw = ctx.measureText(label).width + 12;
+    var bx = Math.min(W - tw - 2, padLeft + plotW + 4);
+    ctx.fillStyle = lineColor;
+    roundRect(ctx, bx, ly - 9, tw, 18, 4);
+    ctx.fill();
+    ctx.fillStyle = '#04070d';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, bx + tw / 2, ly + 4);
+
+    // Eje temporal
+    ctx.fillStyle = COLORS.axis;
+    ctx.font = '10px ui-monospace, "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(timeLabel(data[0].time), padLeft, H - 6);
+    ctx.textAlign = 'right';
+    ctx.fillText(timeLabel(last.time), padLeft + plotW, H - 6);
+  };
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function timeLabel(epoch) {
+    var d = new Date(epoch * 1000);
+    return String(d.getHours()).padStart(2, '0') + ':' +
+           String(d.getMinutes()).padStart(2, '0') + ':' +
+           String(d.getSeconds()).padStart(2, '0');
+  }
+
+  /**
+   * @param {HTMLElement} container div contenedor del gráfico
+   * @returns {{setData:Function, push:Function, engine:string}}
+   */
+  TAI.createChart = function (container) {
+    if (window.LightweightCharts && typeof window.LightweightCharts.createChart === 'function') {
+      try {
+        var tv = new TVChart(container);
+        tv.engine = 'tradingview';
+        return tv;
+      } catch (err) {
+        console.warn('[chart] Lightweight Charts falló, uso el respaldo en canvas:', err);
+        container.innerHTML = '';
+      }
+    }
+    var fallback = new TickChart(container);
+    fallback.engine = 'canvas';
+    return fallback;
+  };
+})(window.TAI);
+
+/* ==== js/ui.js ==== */
+/**
+ * ui.js
+ * Toda la manipulación del DOM vive aquí. Ningún otro módulo toca la interfaz.
+ */
+(function (TAI) {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var el = {};
+  var RING_LENGTH = 2 * Math.PI * 52;   // r = 52 en el SVG
+
+  function cacheElements() {
+    [
+      'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus',
+      'marketSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
+      'mdLast', 'mdHigh', 'mdLow', 'mdRange', 'mdVol', 'mdTrend', 'mdCount', 'mdInterval',
+      'feedText', 'reconnectBtn',
+      'conversation', 'interim', 'micBtn', 'micState', 'micHint', 'waves',
+      'analysisPanel', 'resMarket', 'resDirection', 'resConfidence', 'resConfidenceBar',
+      'resTicks', 'resDuration', 'resTrend', 'resMomentum', 'resVolatility', 'resReason',
+      'countdownCard', 'countdownValue', 'countdownRing', 'cdMarket', 'cdDirection', 'cdTicks', 'cdState',
+      'historyList', 'toast', 'confirmPanel', 'confirmDetails', 'confirmAccept', 'confirmCancel',
+      'textInput', 'sendBtn', 'talkAgainBtn'
+    ].forEach(function (id) { el[id] = $(id); });
+  }
+
+  var STATUS_TEXT = {
+    api: { connecting: 'CONECTANDO', connected: 'CONECTADO', disconnected: 'SIN CONEXIÓN', error: 'ERROR' },
+    ai: { online: 'ACTIVA', thinking: 'ANALIZANDO', offline: 'FUERA DE LÍNEA' },
+    voice: { ready: 'LISTA', listening: 'ESCUCHANDO', speaking: 'HABLANDO', unsupported: 'NO DISPONIBLE' },
+    analysis: { waiting: 'EN ESPERA', running: 'EN CURSO', done: 'EJECUTADO', blocked: 'SIN DATOS' }
+  };
+
+  var STATUS_TONE = {
+    connected: 'ok', online: 'ok', ready: 'ok', done: 'ok',
+    connecting: 'warn', thinking: 'warn', listening: 'warn', speaking: 'warn', running: 'warn',
+    disconnected: 'bad', error: 'bad', offline: 'bad', unsupported: 'bad', blocked: 'bad',
+    waiting: 'idle'
+  };
+
+  function setStatus(key, state) {
+    var node = el[key + 'Status'];
+    if (!node) return;
+    var label = (STATUS_TEXT[key] && STATUS_TEXT[key][state]) || state.toUpperCase();
+    node.dataset.tone = STATUS_TONE[state] || 'idle';
+    var value = node.querySelector('.status-value');
+    if (value) value.textContent = label;
+  }
+
+  function fillMarketSelect(symbols, current) {
+    if (!el.marketSelect) return;
+    el.marketSelect.innerHTML = '';
+    symbols.forEach(function (s) {
+      var opt = document.createElement('option');
+      opt.value = s.code;
+      opt.textContent = s.label;
+      if (s.code === current) opt.selected = true;
+      el.marketSelect.appendChild(opt);
+    });
+  }
+
+  function setMarket(symbolDef) {
+    if (!symbolDef) return;
+    if (el.marketLabel) el.marketLabel.textContent = symbolDef.label;
+    if (el.marketSelect && el.marketSelect.value !== symbolDef.code) el.marketSelect.value = symbolDef.code;
+  }
+
+  function setPrice(price, decimals, changePct, count) {
+    if (el.lastPrice) el.lastPrice.textContent = price == null ? '—' : Number(price).toFixed(decimals);
+    if (el.priceChange) {
+      if (changePct == null) {
+        el.priceChange.textContent = '—';
+        el.priceChange.dataset.dir = 'flat';
+      } else {
+        el.priceChange.textContent = (changePct >= 0 ? '+' : '') + changePct.toFixed(3) + '%';
+        el.priceChange.dataset.dir = changePct > 0 ? 'up' : changePct < 0 ? 'down' : 'flat';
+      }
+    }
+    if (el.tickCount) el.tickCount.textContent = count + ' ticks';
+  }
+
+  /** Datos de mercado en vivo. Recibe null cuando todavía no hay suficientes ticks. */
+  function renderMarketData(d) {
+    var dash = '—';
+    el.mdLast.textContent = d ? d.last : dash;
+    el.mdHigh.textContent = d ? d.high : dash;
+    el.mdLow.textContent = d ? d.low : dash;
+    el.mdRange.textContent = d ? d.range : dash;
+    el.mdVol.textContent = d ? d.volatility : dash;
+    el.mdTrend.textContent = d ? d.trend : dash;
+    el.mdCount.textContent = d ? d.count : '0';
+    el.mdInterval.textContent = d ? d.interval : dash;
+  }
+
+  /** Mensaje sobre el gráfico mientras no hay datos. null lo oculta. */
+  function setChartOverlay(text) {
+    var host = el.chart;
+    if (!host) return;
+    var node = host.querySelector('.chart-overlay');
+
+    if (!text) { if (node) node.remove(); return; }
+
+    if (!node) {
+      node = document.createElement('div');
+      node.className = 'chart-overlay';
+      host.appendChild(node);
+    }
+    node.textContent = text;
+  }
+
+  function setFeedText(text) {
+    if (el.feedText) el.feedText.textContent = text;
+  }
+
+  function addMessage(role, text) {
+    if (!el.conversation || !text) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'msg msg--' + role;
+    var who = document.createElement('span');
+    who.className = 'msg__who';
+    who.textContent = role === 'user' ? 'Tú' : 'Trading AI';
+    var body = document.createElement('p');
+    body.className = 'msg__body';
+    body.textContent = text;
+    wrap.appendChild(who);
+    wrap.appendChild(body);
+    el.conversation.appendChild(wrap);
+    el.conversation.scrollTop = el.conversation.scrollHeight;
+  }
+
+  var MIC_COPY = {
+    idle: { state: 'Hablar con Trading AI', hint: 'Pulsa una vez y quedo escuchando. Vuelve a pulsar para terminar.' },
+    listening: { state: 'Te escucho…', hint: 'Habla con normalidad. Sigo escuchando entre respuestas.' },
+    processing: { state: 'Procesando…', hint: 'Interpretando tu petición.' },
+    analyzing: { state: 'Analizando mercado…', hint: 'Leyendo los ticks recibidos.' },
+    speaking: { state: 'Trading AI responde…', hint: 'Pulsa el micrófono para interrumpir.' },
+    finished: { state: 'Análisis ejecutado', hint: '¿Quieres hacer otro análisis? Solo dímelo.' }
+  };
+
+  function setMicState(state) {
+    if (!el.micBtn) return;
+    el.micBtn.dataset.state = state;
+    var copy = MIC_COPY[state] || MIC_COPY.idle;
+    if (el.micState) el.micState.textContent = copy.state;
+    if (el.micHint) el.micHint.textContent = copy.hint;
+    if (el.waves) el.waves.hidden = state !== 'listening';
+    el.micBtn.setAttribute('aria-pressed', state === 'listening' ? 'true' : 'false');
+  }
+
+  function setInterim(text) {
+    if (!el.interim) return;
+    el.interim.textContent = text || '';
+    el.interim.hidden = !text;
+  }
+
+  var DIRECTION_COPY = {
+    CALL: { text: 'CALL · dirección probable al alza', tone: 'up' },
+    PUT: { text: 'PUT · dirección probable a la baja', tone: 'down' },
+    WAIT: { text: 'ESPERAR · sin dirección clara', tone: 'flat' }
+  };
+
+  function renderAnalysis(a) {
+    if (!el.analysisPanel || !a || !a.ok) return;
+    el.analysisPanel.hidden = false;
+    var dir = DIRECTION_COPY[a.direction] || DIRECTION_COPY.WAIT;
+
+    el.resMarket.textContent = a.market;
+    el.resDirection.textContent = dir.text;
+    el.resDirection.dataset.dir = dir.tone;
+    el.resConfidence.textContent = a.confidence + '%';
+    if (el.resConfidenceBar) el.resConfidenceBar.style.width = a.confidence + '%';
+    el.resTicks.textContent = a.ticks;
+    el.resDuration.textContent = '≈ ' + a.duration + ' s';
+    el.resTrend.textContent = a.trend;
+    el.resMomentum.textContent = a.momentum;
+    el.resVolatility.textContent = a.metrics.volatility.toFixed(3) + '% / tick';
+    el.resReason.textContent = a.reason;
+  }
+
+  function showCountdown(info) {
+    if (!el.countdownCard) return;
+    el.countdownCard.hidden = false;
+    el.cdMarket.textContent = info.market;
+    el.cdDirection.textContent = info.direction;
+    el.cdDirection.dataset.dir = info.direction === 'CALL' ? 'up' : info.direction === 'PUT' ? 'down' : 'flat';
+    el.cdTicks.textContent = info.ticks + (info.ticks === 1 ? ' tick' : ' ticks');
+    el.cdState.textContent = 'Análisis en ejecución';
+    if (el.countdownRing) {
+      el.countdownRing.style.strokeDasharray = RING_LENGTH;
+      el.countdownRing.style.strokeDashoffset = '0';
+    }
+  }
+
+  function updateCountdown(remaining, progress) {
+    if (el.countdownValue) el.countdownValue.textContent = remaining;
+    if (el.countdownRing) el.countdownRing.style.strokeDashoffset = (RING_LENGTH * progress).toFixed(2);
+  }
+
+  function finishCountdown() {
+    if (el.cdState) el.cdState.textContent = 'Análisis ejecutado';
+  }
+
+  function hideCountdown() {
+    if (el.countdownCard) el.countdownCard.hidden = true;
+  }
+
+  function addHistory(entry) {
+    if (!el.historyList) return;
+    var empty = el.historyList.querySelector('.history__empty');
+    if (empty) empty.remove();
+
+    var li = document.createElement('li');
+    li.className = 'history__item';
+    li.innerHTML =
+      '<span class="history__market"></span>' +
+      '<span class="history__dir" data-dir=""></span>' +
+      '<span class="history__meta"></span>';
+    li.querySelector('.history__market').textContent = entry.market;
+    var dirNode = li.querySelector('.history__dir');
+    dirNode.textContent = entry.direction;
+    dirNode.dataset.dir = entry.direction === 'CALL' ? 'up' : entry.direction === 'PUT' ? 'down' : 'flat';
+    li.querySelector('.history__meta').textContent =
+      entry.ticks + (entry.ticks === 1 ? ' tick' : ' ticks') + ' · ' + entry.confidence + '% · ' + entry.time;
+
+    el.historyList.prepend(li);
+    while (el.historyList.children.length > TAI.CONFIG.APP.historyLimit) {
+      el.historyList.removeChild(el.historyList.lastChild);
+    }
+  }
+
+  var toastTimer = null;
+  function toast(message) {
+    if (!el.toast || !message) return;
+    el.toast.textContent = message;
+    el.toast.hidden = false;
+    el.toast.classList.add('is-visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      el.toast.classList.remove('is-visible');
+      setTimeout(function () { el.toast.hidden = true; }, 250);
+    }, 4200);
+  }
+
+  function showConfirm(info, onAccept, onCancel) {
+    if (!el.confirmPanel) return;
+    el.confirmPanel.hidden = false;
+    el.confirmDetails.innerHTML = '';
+    [
+      ['Mercado', info.market],
+      ['Dirección', info.direction],
+      ['Ticks', String(info.ticks)],
+      ['Duración', '≈ ' + info.duration + ' s'],
+      ['Modo', 'Simulación']
+    ].forEach(function (row) {
+      var dt = document.createElement('dt'); dt.textContent = row[0];
+      var dd = document.createElement('dd'); dd.textContent = row[1];
+      el.confirmDetails.appendChild(dt);
+      el.confirmDetails.appendChild(dd);
+    });
+
+    el.confirmAccept.onclick = function () { hideConfirm(); onAccept && onAccept(); };
+    el.confirmCancel.onclick = function () { hideConfirm(); onCancel && onCancel(); };
+  }
+
+  function hideConfirm() {
+    if (el.confirmPanel) el.confirmPanel.hidden = true;
+  }
+
+  TAI.UI = {
+    init: cacheElements,
+    el: el,
+    setStatus: setStatus,
+    fillMarketSelect: fillMarketSelect,
+    setMarket: setMarket,
+    setPrice: setPrice,
+    addMessage: addMessage,
+    setMicState: setMicState,
+    renderMarketData: renderMarketData,
+    setFeedText: setFeedText,
+    setChartOverlay: setChartOverlay,
+    setInterim: setInterim,
+    renderAnalysis: renderAnalysis,
+    showCountdown: showCountdown,
+    updateCountdown: updateCountdown,
+    finishCountdown: finishCountdown,
+    hideCountdown: hideCountdown,
+    addHistory: addHistory,
+    toast: toast,
+    showConfirm: showConfirm,
+    hideConfirm: hideConfirm
+  };
+})(window.TAI);
+
+/* ==== js/app.js ==== */
+/**
+ * app.js
+ * Orquestador. Conecta interfaz ↔ voz ↔ IA ↔ datos de mercado ↔ análisis ↔ countdown.
+ * No contiene lógica de análisis ni de red: solo coordina el flujo.
+ */
+(function (TAI) {
+  'use strict';
+
+  var CFG = TAI.CONFIG;
+  var UI = TAI.UI;
+  var Voice = TAI.Voice;
+  var Market = TAI.MarketAPI;
+
+  var state = {
+    symbol: CFG.MARKET.defaultSymbol,
+    busy: false,
+    lastAnalysis: null,
+    conversation: [],
+    chart: null,
+    micOpen: false,      // el micrófono queda abierto tras un solo toque
+    pendingInput: null,
+    busySince: 0,
+    silenceStreak: 0,    // turnos seguidos sin escuchar nada
+    greeted: false
+  };
+
+  /* ------------------------------- arranque ------------------------------- */
+
+  function init() {
+    UI.init();
+    UI.fillMarketSelect(CFG.MARKET.symbols, state.symbol);
+    UI.setMarket(TAI.getSymbol(state.symbol));
+    UI.setMicState('idle');
+    UI.setStatus('ai', 'online');
+    UI.setStatus('analysis', 'waiting');
+    UI.setStatus('voice', Voice.supported ? 'ready' : 'unsupported');
+
+    if (!state.chart) {
+      UI.el.chart.innerHTML = '';                 // evita gráficos duplicados al recargar
+      state.chart = TAI.createChart(UI.el.chart);
+      UI.setChartOverlay('Conectando con el mercado…');
+    }
+
+    if (!Voice.supported) {
+      UI.toast('El reconocimiento de voz no está disponible en este navegador. Puedes escribir tu petición.');
+    }
+
+    bindUI();
+    bindVoice();
+    bindMarket();
+
+    Market.connect();
+
+    greet();
+  }
+
+  /**
+   * Saludo de bienvenida. El texto aparece de inmediato; la voz espera al primer
+   * gesto del usuario porque los navegadores bloquean el audio sin interacción.
+   */
+  function greet() {
+    var text = CFG.APP.greeting;
+    UI.addMessage('ai', text);
+    state.conversation.push({ role: 'assistant', content: text });
+
+    function speakGreeting() {
+      document.removeEventListener('pointerdown', speakGreeting);
+      document.removeEventListener('keydown', speakGreeting);
+      if (state.greeted) return;
+      state.greeted = true;
+      Voice.unlock();
+      Voice.speak(text);
+    }
+
+    document.addEventListener('pointerdown', speakGreeting, { once: false });
+    document.addEventListener('keydown', speakGreeting, { once: false });
+  }
+
+  /* ------------------------------- interfaz ------------------------------- */
+
+  function bindUI() {
+    UI.el.micBtn.addEventListener('click', function () {
+      Voice.unlock();                       // necesario en iOS: gesto del usuario
+      if (!Voice.supported) {
+        UI.toast('El reconocimiento de voz no está disponible en este navegador. Escribe tu petición abajo.');
+        UI.el.textInput && UI.el.textInput.focus();
+        return;
+      }
+
+      if (state.micOpen) { closeMic(); return; }
+
+      state.micOpen = true;
+      state.silenceStreak = 0;
+      if (Voice.speaking) Voice.cancelSpeech();
+      Voice.startListening();               // pide permiso solo la primera vez
+    });
+
+    UI.el.talkAgainBtn.addEventListener('click', function () {
+      Voice.unlock();
+      UI.hideCountdown();
+      UI.setMicState('idle');
+      if (!Voice.supported) { UI.el.textInput && UI.el.textInput.focus(); return; }
+      state.micOpen = true;
+      state.silenceStreak = 0;
+      Voice.cancelSpeech();
+      Voice.startListening();
+    });
+
+    UI.el.sendBtn.addEventListener('click', submitText);
+    UI.el.textInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); submitText(); }
+    });
+
+    UI.el.marketSelect.addEventListener('change', function (e) {
+      switchMarket(e.target.value, true);
+    });
+
+    UI.el.reconnectBtn.addEventListener('click', function () {
+      UI.setFeedText('Reconectando con el mercado…');
+      Market.reconnectNow();
+    });
+  }
+
+  function submitText() {
+    var text = (UI.el.textInput.value || '').trim();
+    if (!text) return;
+    UI.el.textInput.value = '';
+    handleUserInput(text);
+  }
+
+  /* --------------------------------- voz --------------------------------- */
+
+  function bindVoice() {
+    Voice.on('start', function () {
+      UI.setMicState('listening');
+      UI.setStatus('voice', 'listening');
+      UI.setInterim('');
+    });
+
+    Voice.on('interim', function (p) { UI.setInterim(p.text); });
+
+    Voice.on('end', function () {
+      UI.setInterim('');
+      UI.setStatus('voice', 'ready');
+      if (state.busy) return;
+
+      if (state.micOpen) {
+        state.silenceStreak++;
+        if (state.silenceStreak > 8) {
+          closeMic();
+          UI.toast('Dejé de escuchar por inactividad. Pulsa el micrófono cuando quieras seguir.');
+          return;
+        }
+        resumeListening();
+        return;
+      }
+      UI.setMicState('idle');
+    });
+
+    Voice.on('final', function (p) {
+      state.silenceStreak = 0;
+      handleUserInput(p.text);
+    });
+
+    Voice.on('error', function (p) {
+      UI.toast(p.message);
+      UI.setMicState('idle');
+      UI.setStatus('voice', Voice.supported ? 'ready' : 'unsupported');
+    });
+
+    Voice.on('speakstart', function () { UI.setStatus('voice', 'speaking'); });
+    Voice.on('speakend', function () { UI.setStatus('voice', Voice.supported ? 'ready' : 'unsupported'); });
+  }
+
+  /** Reabre el micrófono si la conversación sigue activa. */
+  function resumeListening() {
+    if (!state.micOpen || !Voice.supported) return;
+    if (Voice.listening || Voice.speaking) return;
+    setTimeout(function () {
+      if (state.micOpen && !Voice.listening && !Voice.speaking) {
+        Voice.startListening({ skipPermission: Voice.permissionGranted });
+      }
+    }, 400);
+  }
+
+  function closeMic() {
+    state.micOpen = false;
+    state.silenceStreak = 0;
+    Voice.stopListening();
+    Voice.cancelSpeech();
+    Voice.releaseMicrophone();      // el permiso ya quedó concedido: no se volverá a pedir
+    UI.setMicState('idle');
+  }
+
+  function say(text) {
+    UI.addMessage('ai', text);
+    state.conversation.push({ role: 'assistant', content: text });
+    UI.setMicState('speaking');
+    Voice.mute(true);                       // evita que la IA se transcriba a sí misma
+    return Voice.speak(text).then(function () {
+      Voice.mute(false);
+      if (state.micOpen && !Voice.listening) resumeListening();
+    });
+  }
+
+  /* ------------------------------ mercado ------------------------------ */
+
+  function bindMarket() {
+    Market.on('status', function (s) {
+      UI.setStatus('api', s.state);
+      if (s.state === 'connecting') UI.setChartOverlay('Conectando con el mercado…');
+      if (s.state === 'error' || s.state === 'disconnected') {
+        UI.setChartOverlay('Sin datos del mercado. Pulsa «Reconectar».');
+        UI.toast(s.message);
+      }
+    });
+
+    Market.on('history', function (p) {
+      var def = TAI.getSymbol(p.symbol);
+      state.chart.setData(p.ticks, def ? def.decimals : 3);
+      UI.setChartOverlay(p.ticks.length ? null : 'Esperando los primeros ticks…');
+      refreshPrice();
+    });
+
+    Market.on('tick', function (p) {
+      state.chart.push(p.tick);
+      UI.setChartOverlay(null);
+      refreshPrice();
+    });
+
+    Market.on('error', function (p) { UI.toast(p.message); });
+  }
+
+  var lastPanelUpdate = 0;
+
+  function refreshPrice() {
+    var data = Market.getMarketData();
+    var def = TAI.getSymbol(data.symbol) || { decimals: 3 };
+    var change = null;
+    if (data.ticks.length > 1) {
+      var first = data.ticks[Math.max(0, data.ticks.length - 60)].price;
+      change = (data.lastPrice - first) / first * 100;
+    }
+    UI.setPrice(data.lastPrice, def.decimals, change, data.ticks.length);
+
+    // El panel de métricas se recalcula como mucho dos veces por segundo
+    if (Date.now() - lastPanelUpdate < 500) return;
+    lastPanelUpdate = Date.now();
+    updateMarketPanel(data, def);
+  }
+
+  function updateMarketPanel(data, def) {
+    var ticks = data.ticks;
+    var faltan = CFG.MARKET.minTicksForAnalysis - ticks.length;
+
+    if (ticks.length < 12) {
+      UI.renderMarketData(null);
+      UI.setFeedText(Market.isConnected()
+        ? 'Recibiendo ticks de ' + (TAI.getSymbol(data.symbol) || {}).label + '…'
+        : 'Sin conexión con el mercado.');
+      return;
+    }
+
+    var m = TAI.AnalysisEngine.computeMetrics(ticks);
+    var window50 = ticks.slice(-50).map(function (t) { return t.price; });
+    var high = Math.max.apply(null, window50);
+    var low = Math.min.apply(null, window50);
+
+    UI.renderMarketData({
+      last: data.lastPrice.toFixed(def.decimals),
+      high: high.toFixed(def.decimals),
+      low: low.toFixed(def.decimals),
+      range: (high - low).toFixed(def.decimals),
+      volatility: m.volatility.toFixed(3) + '%',
+      trend: m.trendZ > 0.6 ? 'Alcista' : m.trendZ < -0.6 ? 'Bajista' : 'Lateral',
+      count: String(ticks.length),
+      interval: m.tickInterval + ' s'
+    });
+
+    UI.setFeedText(faltan > 0
+      ? 'Faltan ' + faltan + ' ticks para poder analizar.'
+      : 'Datos listos · actualizado ' + new Date(data.updatedAt * 1000).toLocaleTimeString('es-CO'));
+  }
+
+  function switchMarket(symbol, announce) {
+    var def = TAI.getSymbol(symbol);
+    if (!def || symbol === state.symbol) return false;
+    state.symbol = symbol;
+    UI.setMarket(def);
+    UI.setPrice(null, def.decimals, null, 0);
+    state.chart.setData([], def.decimals);
+    Market.subscribe(symbol);
+    if (announce) UI.addMessage('ai', 'Mercado activo: ' + def.label + '.');
+    return true;
+  }
+
+  /** Espera a que haya suficientes ticks reales del mercado activo. */
+  function waitForData(timeoutMs) {
+    if (Market.hasEnoughData()) return Promise.resolve(true);
+    return new Promise(function (resolve) {
+      var start = Date.now();
+      var timer = setInterval(function () {
+        if (Market.hasEnoughData()) { clearInterval(timer); resolve(true); }
+        else if (Date.now() - start > timeoutMs) { clearInterval(timer); resolve(false); }
+      }, 250);
+    });
+  }
+
+  /* ---------------------------- flujo principal ---------------------------- */
+
+  function handleUserInput(rawText) {
+    var text = (rawText || '').trim();
+    if (!text) return;
+
+    if (state.busy) {
+      state.pendingInput = text;        // se atiende en cuanto termine el turno actual
+      return;
+    }
+
+    state.busy = true;
+    state.busySince = Date.now();
+    UI.addMessage('user', text);
+    state.conversation.push({ role: 'user', content: text });
+    UI.setInterim('');
+    UI.setMicState('processing');
+    UI.setStatus('ai', 'thinking');
+
+    var intent = TAI.AIEngine.detectIntent(text);
+    var detected = TAI.AIEngine.detectMarket(text);
+
+    // Fuera de tema: respuesta exacta, sin análisis ni datos
+    if (intent === 'OFF_TOPIC') {
+      return say(TAI.AIEngine.OFF_TOPIC_REPLY).then(function () { finishTurn('idle'); });
+    }
+
+    if (detected) switchMarket(detected.code, false);
+
+    var isAnalysis = ['ANALYZE', 'ANALYZE_AND_EXECUTE', 'PREDICTION', 'REPEAT', 'UNKNOWN'].indexOf(intent) !== -1;
+
+    var opening;
+    if (isAnalysis) {
+      UI.setStatus('analysis', 'running');
+      UI.setMicState('analyzing');
+      var marketName = TAI.AIEngine.spokenMarket((TAI.getSymbol(state.symbol) || {}).label);
+      opening = say('Analizando mercado. ' + marketName + '.');
+    } else {
+      opening = Promise.resolve();
+    }
+
+    return opening
+      .then(function () {
+        var needsData = isAnalysis || ['RECOMMEND_TICKS', 'RECOMMEND_VOLATILITY', 'MARKET_STATE'].indexOf(intent) !== -1;
+        if (!needsData) return true;
+        return isAnalysis ? waitForData(15000) : Market.hasEnoughData();
+      })
+      .then(function (ready) {
+        if (!ready && !Market.isConnected()) {
+          UI.setStatus('analysis', 'blocked');
+          return say('No hay conexión con los datos del mercado. No puedo analizar sin datos reales.')
+            .then(function () { finishTurn('idle'); });
+        }
+        if (!ready) {
+          UI.setStatus('analysis', 'blocked');
+          return say('Necesito más datos de mercado para realizar el análisis. Aún no tengo suficientes ticks de ' +
+            TAI.AIEngine.spokenMarket((TAI.getSymbol(state.symbol) || {}).label) + '.')
+            .then(function () { finishTurn('idle'); });
+        }
+        return runAI(text, intent);
+      })
+      .catch(function (err) {
+        console.error('[app]', err);
+        UI.toast('Ocurrió un problema al procesar la petición.');
+        finishTurn('idle');
+      });
+  }
+
+  function runAI(text, intent) {
+    var data = Market.getMarketData();
+
+    return TAI.askTradingAI({
+      userQuestion: text,
+      intent: intent,
+      market: state.symbol,
+      recentTicks: data.ticks.slice(-CFG.AI.maxContextTicks),
+      priceHistory: data.ticks,
+      indicators: state.lastAnalysis ? state.lastAnalysis.metrics : null,
+      previousConversation: state.conversation.slice(-8)
+    }).then(function (result) {
+      UI.setStatus('ai', 'online');
+
+      if (result.analysis && result.analysis.ok) {
+        state.lastAnalysis = result.analysis;
+        UI.renderAnalysis(result.analysis);
+      }
+
+      if (result.intent === 'insufficient_data') {
+        UI.setStatus('analysis', 'blocked');
+        return say(result.speech).then(function () { finishTurn('idle'); });
+      }
+
+      if (result.intent === 'recommend_volatility' && result.suggestedMarket) {
+        return say(result.speech).then(function () {
+          switchMarket(result.suggestedMarket.code, true);
+          finishTurn('idle');
+        });
+      }
+
+      if (result.intent === 'analyze_and_execute') {
+        return say(result.speech + ' Estamos en modo simulación: confirma en pantalla para ejecutar el análisis.')
+          .then(function () {
+            UI.setMicState('idle');
+            UI.showConfirm({
+              market: result.market,
+              direction: result.direction,
+              ticks: result.ticks,
+              duration: result.duration
+            }, function () {
+              runCountdown(result);
+            }, function () {
+              say('Análisis cancelado. No se ejecutó ninguna operación.').then(function () { finishTurn('idle'); });
+            });
+            state.busy = false;   // el usuario debe poder interactuar con la confirmación
+          });
+      }
+
+      if (result.intent === 'market_analysis' || result.intent === 'prediction') {
+        return say(result.speech).then(function () { runCountdown(result); });
+      }
+
+      // recommend_ticks, market_state, help, risk, off_topic, error
+      UI.setStatus('analysis', 'waiting');
+      return say(result.speech).then(function () { finishTurn('idle'); });
+    });
+  }
+
+  /* ----------------------------- cuenta regresiva ----------------------------- */
+
+  function runCountdown(result) {
+    state.busy = true;
+    UI.setStatus('analysis', 'running');
+    UI.showCountdown({
+      market: result.market,
+      direction: result.direction,
+      ticks: result.ticks
+    });
+
+    TAI.startCountdown({
+      seconds: CFG.APP.countdownSeconds,
+      onTick: function (remaining, progress) { UI.updateCountdown(remaining, progress); },
+      onDone: function () {
+        UI.finishCountdown();
+        UI.setStatus('analysis', 'done');
+        UI.addHistory({
+          market: result.market,
+          direction: result.direction,
+          ticks: result.ticks,
+          confidence: result.confidence,
+          time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+        });
+        say('Análisis ejecutado. ¿Quieres hacer otro análisis?').then(function () {
+          finishTurn('finished');
+        });
+      }
+    });
+  }
+
+  function finishTurn(micState) {
+    state.busy = false;
+    state.busySince = 0;
+    UI.setStatus('ai', 'online');
+    UI.setMicState(micState || 'idle');
+
+    if (state.pendingInput) {
+      var next = state.pendingInput;
+      state.pendingInput = null;
+      setTimeout(function () { handleUserInput(next); }, 250);
+      return;
+    }
+    resumeListening();
+  }
+
+  /** Si un turno se queda colgado, se libera para que la app no deje de responder. */
+  setInterval(function () {
+    if (state.busy && state.busySince && Date.now() - state.busySince > 45000) {
+      console.warn('[app] turno colgado, liberando');
+      finishTurn('idle');
+    }
+  }, 5000);
+
+  /* --------------------------------- init --------------------------------- */
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+
+  TAI.App = { state: state, handleUserInput: handleUserInput, switchMarket: switchMarket, closeMic: closeMic };
+})(window.TAI);
+
+  </script>
+</body>
+</html>
