@@ -190,7 +190,26 @@ p { margin: 0; }
 .market-name { margin-top: 8px; font-size: 0.8rem; color: var(--ink-dim); }
 
 .price { text-align: right; display: grid; gap: 3px; }
-.price__value { font-family: var(--mono); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; }
+.price__value {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  border-radius: 6px;
+  padding: 0 4px;
+  transition: color 0.25s ease, background 0.35s ease;
+}
+.price__value.is-tick[data-tick="up"] { animation: tick-up 0.45s ease-out; }
+.price__value.is-tick[data-tick="down"] { animation: tick-down 0.45s ease-out; }
+
+@keyframes tick-up {
+  0% { color: var(--up); background: rgba(46, 230, 168, 0.22); }
+  100% { color: var(--ink); background: transparent; }
+}
+@keyframes tick-down {
+  0% { color: var(--down); background: rgba(255, 90, 118, 0.22); }
+  100% { color: var(--ink); background: transparent; }
+}
 .price__change { font-family: var(--mono); font-size: 0.82rem; }
 .price__change[data-dir="up"] { color: var(--up); }
 .price__change[data-dir="down"] { color: var(--down); }
@@ -199,7 +218,7 @@ p { margin: 0; }
 
 .chart-wrap {
   position: relative;
-  height: 240px;
+  height: 270px;
   border-radius: var(--r-md);
   background: rgba(3, 6, 12, 0.55);
   border: 1px solid rgba(148, 178, 255, 0.08);
@@ -597,7 +616,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     align-items: start;
   }
   .panel--market { grid-column: 1; grid-row: 1 / span 2; }
-  .chart-wrap { height: 340px; }
+  .chart-wrap { height: 380px; }
   .panel--chat { grid-column: 2; }
   .panel--analysis { grid-column: 1; }
   .panel--confirm, .panel--countdown, .panel--history { grid-column: 2; }
@@ -863,7 +882,7 @@ TAI.CONFIG = {
   /* MERCADOS                                                            */
   /* ------------------------------------------------------------------ */
   MARKET: {
-    defaultSymbol: 'R_75',
+    defaultSymbol: '1HZ75V',
     minTicksForAnalysis: 25,
     symbols: [
       { code: 'R_10',    label: 'Volatility 10',        index: 10,  oneSecond: false, decimals: 3 },
@@ -2343,7 +2362,10 @@ TAI.getSymbol = function (code) {
         borderColor: 'rgba(148,178,255,0.12)',
         timeVisible: true,
         secondsVisible: true,
-        rightOffset: 4
+        rightOffset: 6,
+        barSpacing: 7,
+        shiftVisibleRangeOnNewBar: true,   // la vela nueva empuja la vista: movimiento continuo
+        fixLeftEdge: false
       },
       crosshair: {
         mode: 0,
@@ -2359,7 +2381,13 @@ TAI.getSymbol = function (code) {
       lineWidth: 2,
       topColor: 'rgba(46,230,168,0.28)',
       bottomColor: 'rgba(46,230,168,0.02)',
+      priceLineVisible: true,
+      priceLineWidth: 1,
+      priceLineStyle: 2,
       priceLineColor: COLORS.up,
+      lastValueVisible: true,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 4,
       crosshairMarkerBackgroundColor: '#05080f',
       priceFormat: { type: 'price', precision: this.decimals, minMove: Math.pow(10, -this.decimals) }
     });
@@ -2407,7 +2435,10 @@ TAI.getSymbol = function (code) {
     this.lastTime = data.length ? data[data.length - 1].time : 0;
     this.firstPrice = data.length ? data[0].value : null;
     this._recolor(data.length ? data[data.length - 1].value : null);
-    if (data.length) this.chart.timeScale().scrollToRealTime();
+    if (data.length) {
+      this._focusRecent(data.length, 90);
+      this.chart.timeScale().scrollToRealTime();
+    }
   };
 
   TVChart.prototype.push = function (tick) {
@@ -2416,6 +2447,14 @@ TAI.getSymbol = function (code) {
     this.series.update({ time: tick.time, value: tick.price });
     this.lastTime = tick.time;
     this._recolor(tick.price);
+    this.chart.timeScale().scrollToRealTime();   // la vista sigue al último tick
+  };
+
+  /** Deja a la vista los últimos N ticks para que el movimiento se note. */
+  TVChart.prototype._focusRecent = function (total, visible) {
+    if (total < 5) return;
+    var from = Math.max(0, total - (visible || 90));
+    this.chart.timeScale().setVisibleLogicalRange({ from: from, to: total + 6 });
   };
 
   /* ======================= respaldo en canvas propio ======================= */
@@ -2433,7 +2472,7 @@ TAI.getSymbol = function (code) {
     this.ctx = canvas.getContext('2d');
     this.ticks = [];
     this.decimals = 3;
-    this.visible = 120;
+    this.visible = 90;
     this._raf = null;
     this._bind();
   }
@@ -2698,8 +2737,21 @@ TAI.getSymbol = function (code) {
     if (el.marketSelect && el.marketSelect.value !== symbolDef.code) el.marketSelect.value = symbolDef.code;
   }
 
+  var prevPrice = null;
+
   function setPrice(price, decimals, changePct, count) {
-    if (el.lastPrice) el.lastPrice.textContent = price == null ? '—' : Number(price).toFixed(decimals);
+    if (el.lastPrice) {
+      el.lastPrice.textContent = price == null ? '—' : Number(price).toFixed(decimals);
+
+      if (price != null && prevPrice != null && price !== prevPrice) {
+        var dir = price > prevPrice ? 'up' : 'down';
+        el.lastPrice.dataset.tick = dir;
+        el.lastPrice.classList.remove('is-tick');
+        void el.lastPrice.offsetWidth;          // reinicia la animación
+        el.lastPrice.classList.add('is-tick');
+      }
+      if (price != null) prevPrice = price;
+    }
     if (el.priceChange) {
       if (changePct == null) {
         el.priceChange.textContent = '—';
@@ -3037,6 +3089,7 @@ TAI.getSymbol = function (code) {
     pendingInput: null,
     busySince: 0,
     autoBriefDone: false,
+    lastTickAt: 0,
     lastLiveRefresh: 0,
     silenceStreak: 0,    // turnos seguidos sin escuchar nada
     greeted: false
@@ -3245,6 +3298,7 @@ TAI.getSymbol = function (code) {
     });
 
     Market.on('tick', function (p) {
+      state.lastTickAt = Date.now();
       state.chart.push(p.tick);
       UI.setChartOverlay(null);
       refreshPrice();
@@ -3557,6 +3611,15 @@ TAI.getSymbol = function (code) {
     }
     resumeListening();
   }
+
+  /** Si el flujo de ticks se detiene, se reconecta solo: el gráfico nunca se queda congelado. */
+  setInterval(function () {
+    if (!state.lastTickAt) return;
+    if (Date.now() - state.lastTickAt < 20000) return;
+    state.lastTickAt = Date.now();
+    UI.setChartOverlay('El mercado dejó de enviar ticks. Reconectando…');
+    Market.reconnectNow();
+  }, 5000);
 
   /** Si un turno se queda colgado, se libera para que la app no deje de responder. */
   setInterval(function () {
