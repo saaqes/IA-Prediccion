@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <meta name="theme-color" content="#05080f">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="description" content="Trading AI — asistente de voz para análisis y predicción de índices de volatilidad.">
   <title>Trading AI · AI Market Prediction</title>
@@ -83,6 +82,7 @@ p { margin: 0; }
 .brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .brand__name { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.01em; }
 .brand__sub { color: var(--ink-dim); font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; }
+.brand__ver { letter-spacing: 0.04em; opacity: 0.55; font-family: var(--mono); font-size: 0.68rem; }
 
 .statusbar {
   display: flex;
@@ -639,7 +639,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   <header class="topbar">
     <div class="brand">
       <h1 class="brand__name">Trading AI</h1>
-      <p class="brand__sub">AI Market Prediction</p>
+      <p class="brand__sub">AI Market Prediction <span class="brand__ver" id="appVersion"></span></p>
     </div>
 
     <div class="statusbar" role="status" aria-live="polite">
@@ -843,6 +843,9 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
  */
 window.TAI = window.TAI || {};
 
+/** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
+TAI.VERSION = '1.6.0';
+
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
   /* API DE MERCADO (Deriv WebSocket público: solo lectura de ticks)      */
@@ -883,7 +886,10 @@ TAI.CONFIG = {
   /* MERCADOS                                                            */
   /* ------------------------------------------------------------------ */
   MARKET: {
+    // Preferencia, no verdad absoluta: la lista real se pide al servidor
+    // con active_symbols. Si no llega, la app NO inventa códigos.
     defaultSymbol: '1HZ75V',
+    requireServerSymbols: true,
     minTicksForAnalysis: 25,
     symbols: [
       { code: 'R_10',    label: 'Volatility 10',        index: 10,  oneSecond: false, decimals: 3 },
@@ -1019,8 +1025,15 @@ TAI.getSymbol = function (code) {
       self._send({ active_symbols: 'brief', product_type: 'basic' });
 
       self._symbolsTimer = setTimeout(function () {
-        if (!self.symbolsReady) self._startStreams();     // respaldo si no responde
-      }, 6000);
+        if (self.symbolsReady) return;
+        if (TAI.CONFIG.MARKET.requireServerSymbols) {
+          // Antes se caía a la lista fija y eso provocaba diez InvalidSymbol seguidos
+          self._setState('error', 'El proveedor no envió la lista de mercados. Pulsa «Reconectar».');
+          self.emit('error', { message: 'No pude obtener la lista de mercados del proveedor.', code: 'NoSymbolList' });
+        } else {
+          self._startStreams();
+        }
+      }, 8000);
     };
 
     this.socket.onmessage = function (event) {
@@ -1130,7 +1143,8 @@ TAI.getSymbol = function (code) {
    */
   /** Arranca el stream del mercado activo y la tabla, ya con símbolos validados. */
   MarketAPI.prototype._startStreams = function () {
-    var list = TAI.CONFIG.MARKET.symbols;
+    var list = TAI.CONFIG.MARKET.symbols || [];
+    console.info('[MarketAPI] mercados disponibles:', list.length, list.map(function (s) { return s.code; }).join(', '));
     var wanted = this._wantedSymbol;
     var exists = list.some(function (s) { return s.code === wanted; });
     var target = exists ? wanted : (list[0] && list[0].code);
@@ -1230,12 +1244,21 @@ TAI.getSymbol = function (code) {
       this.lastError = (data.error.code || '') + ' ' + (data.error.message || '');
       var pedido = data.echo_req && data.echo_req.ticks_history;
 
+      if (data.error.code === 'InvalidSymbol' && pedido === this.symbol) {
+        console.warn('[MarketAPI] el mercado activo no existe en este app_id, recargo la lista');
+        this.symbolsReady = false;
+        this._wantedSymbol = null;
+        this.symbol = null;
+        this._send({ active_symbols: 'brief', product_type: 'basic' });
+        return;
+      }
+
       if (data.error.code === 'InvalidSymbol' && pedido) {
         // Se descarta ese mercado y se sigue: la app no se queda sin datos por uno malo
         delete this.watch[pedido];
         TAI.CONFIG.MARKET.symbols = TAI.CONFIG.MARKET.symbols.filter(function (s) { return s.code !== pedido; });
         this.emit('symbols', { symbols: TAI.CONFIG.MARKET.symbols });
-        console.warn('[MarketAPI] símbolo descartado:', pedido);
+        console.info('[MarketAPI] símbolo no disponible, descartado:', pedido);
         return;
       }
 
@@ -1247,8 +1270,13 @@ TAI.getSymbol = function (code) {
 
     if (data.msg_type === 'active_symbols') {
       if (this._symbolsTimer) { clearTimeout(this._symbolsTimer); this._symbolsTimer = null; }
+      var recibidos = (data.active_symbols || []).length;
+      console.info('[MarketAPI] active_symbols recibidos:', recibidos);
       var ok = this._loadSymbols(data.active_symbols);
-      if (!ok) this.emit('error', { message: 'El proveedor no devolvió mercados disponibles.', code: 'NoSymbols' });
+      if (!ok) {
+        this.emit('error', { message: 'El proveedor no devolvió mercados disponibles.', code: 'NoSymbols' });
+        return;
+      }
       this._startStreams();
       return;
     }
@@ -2768,7 +2796,7 @@ TAI.getSymbol = function (code) {
       'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus',
       'marketSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
       'mdLast', 'mdHigh', 'mdLow', 'mdRange', 'mdVol', 'mdTrend', 'mdCount', 'mdInterval',
-      'feedText', 'reconnectBtn', 'watchBody', 'tvWidget',
+      'feedText', 'reconnectBtn', 'watchBody', 'tvWidget', 'appVersion',
       'conversation', 'interim', 'micBtn', 'micState', 'micHint', 'waves',
       'analysisPanel', 'resMarket', 'resDirection', 'resConfidence', 'resConfidenceBar',
       'resTicks', 'resDuration', 'resTrend', 'resMomentum', 'resVolatility', 'resReason',
@@ -3181,6 +3209,8 @@ TAI.getSymbol = function (code) {
 
   function init() {
     UI.init();
+    console.info('%cTrading AI v' + TAI.VERSION, 'color:#2ee6a8;font-weight:600');
+    if (UI.el.appVersion) UI.el.appVersion.textContent = 'v' + TAI.VERSION;
     UI.fillMarketSelect(CFG.MARKET.symbols, state.symbol);
     UI.setMarket(TAI.getSymbol(state.symbol));
     UI.setMicState('idle');
