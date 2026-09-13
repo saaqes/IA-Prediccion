@@ -24,8 +24,8 @@
   --panel-line: rgba(148, 178, 255, 0.14);
   --ink: #e8edf6;
   --ink-dim: #8ea0bd;
-  --up: #2ee6a8;
-  --down: #ff5a76;
+  --up: #26a69a;   /* verde de TradingView */
+  --down: #ef5350; /* rojo de TradingView */
   --flat: #8ea0bd;
   --signal: #8b6bff;
   --warn: #ffc766;
@@ -59,7 +59,7 @@ body {
   padding-bottom: calc(var(--dock-height) + var(--safe-bottom));
   background-image:
     radial-gradient(1200px 520px at 12% -10%, rgba(139, 107, 255, 0.16), transparent 60%),
-    radial-gradient(900px 460px at 92% 4%, rgba(46, 230, 168, 0.10), transparent 62%);
+    radial-gradient(900px 460px at 92% 4%, rgba(38, 166, 154, 0.10), transparent 62%);
   background-attachment: fixed;
 }
 
@@ -113,9 +113,9 @@ p { margin: 0; }
   background: var(--flat);
   box-shadow: 0 0 0 3px rgba(142, 160, 189, 0.14);
 }
-.status[data-tone="ok"] .status__dot { background: var(--up); box-shadow: 0 0 0 3px rgba(46, 230, 168, 0.18); }
+.status[data-tone="ok"] .status__dot { background: var(--up); box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.18); }
 .status[data-tone="warn"] .status__dot { background: var(--warn); box-shadow: 0 0 0 3px rgba(255, 199, 102, 0.18); animation: pulse 1.4s ease-in-out infinite; }
-.status[data-tone="bad"] .status__dot { background: var(--down); box-shadow: 0 0 0 3px rgba(255, 90, 118, 0.18); }
+.status[data-tone="bad"] .status__dot { background: var(--down); box-shadow: 0 0 0 3px rgba(239, 83, 80, 0.18); }
 
 @keyframes pulse { 50% { opacity: 0.35; } }
 
@@ -207,11 +207,11 @@ p { margin: 0; }
 .price__value.is-tick[data-tick="down"] { animation: tick-down 0.45s ease-out; }
 
 @keyframes tick-up {
-  0% { color: var(--up); background: rgba(46, 230, 168, 0.22); }
+  0% { color: var(--up); background: rgba(38, 166, 154, 0.22); }
   100% { color: var(--ink); background: transparent; }
 }
 @keyframes tick-down {
-  0% { color: var(--down); background: rgba(255, 90, 118, 0.22); }
+  0% { color: var(--down); background: rgba(239, 83, 80, 0.22); }
   100% { color: var(--ink); background: transparent; }
 }
 .price__change { font-family: var(--mono); font-size: 0.82rem; }
@@ -351,7 +351,7 @@ p { margin: 0; }
   color: #04120c;
   font-weight: 600;
 }
-.btn--primary:hover { background: #4cf0b8; }
+.btn--primary:hover { background: #2fbfae; }
 
 /* ------------------------------ análisis ------------------------------ */
 
@@ -367,8 +367,8 @@ p { margin: 0; }
   border-radius: var(--r-md);
   border: 1px solid;
 }
-.direction[data-dir="up"] { color: var(--up); border-color: rgba(46, 230, 168, 0.4); background: rgba(46, 230, 168, 0.08); }
-.direction[data-dir="down"] { color: var(--down); border-color: rgba(255, 90, 118, 0.4); background: rgba(255, 90, 118, 0.08); }
+.direction[data-dir="up"] { color: var(--up); border-color: rgba(38, 166, 154, 0.4); background: rgba(38, 166, 154, 0.08); }
+.direction[data-dir="down"] { color: var(--down); border-color: rgba(239, 83, 80, 0.4); background: rgba(239, 83, 80, 0.08); }
 .direction[data-dir="flat"] { color: var(--flat); border-color: var(--panel-line); background: var(--panel); }
 
 .confidence__row { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--ink-dim); }
@@ -438,8 +438,8 @@ p { margin: 0; }
   border: 1px solid var(--panel-line);
   background: var(--panel);
 }
-.cd-dir[data-dir="up"] { color: var(--up); border-color: rgba(46, 230, 168, 0.45); }
-.cd-dir[data-dir="down"] { color: var(--down); border-color: rgba(255, 90, 118, 0.45); }
+.cd-dir[data-dir="up"] { color: var(--up); border-color: rgba(38, 166, 154, 0.45); }
+.cd-dir[data-dir="down"] { color: var(--down); border-color: rgba(239, 83, 80, 0.45); }
 
 .ring { position: relative; width: 138px; height: 138px; }
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -558,17 +558,17 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
 .mic[data-state="listening"] {
   border-color: var(--down);
-  background: radial-gradient(circle at 50% 35%, rgba(255, 90, 118, 0.5), rgba(11, 18, 32, 0.95));
-  box-shadow: 0 0 0 0 rgba(255, 90, 118, 0.45);
+  background: radial-gradient(circle at 50% 35%, rgba(239, 83, 80, 0.5), rgba(11, 18, 32, 0.95));
+  box-shadow: 0 0 0 0 rgba(239, 83, 80, 0.45);
   animation: mic-pulse 1.5s ease-out infinite;
 }
 .mic[data-state="analyzing"],
 .mic[data-state="processing"] { border-color: var(--warn); box-shadow: 0 10px 30px rgba(255, 199, 102, 0.22); }
-.mic[data-state="speaking"] { border-color: var(--up); box-shadow: 0 10px 30px rgba(46, 230, 168, 0.24); }
+.mic[data-state="speaking"] { border-color: var(--up); box-shadow: 0 10px 30px rgba(38, 166, 154, 0.24); }
 
 @keyframes mic-pulse {
-  70% { box-shadow: 0 0 0 22px rgba(255, 90, 118, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 90, 118, 0); }
+  70% { box-shadow: 0 0 0 22px rgba(239, 83, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 83, 80, 0); }
 }
 
 .mic-state { font-size: 0.88rem; font-weight: 500; margin-top: 6px; }
@@ -846,98 +846,6 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
   <script>
 /* ==== js/config.js ==== */
-/**
- * config.js
- * Configuración central de la aplicación. No contiene secretos.
- * Cualquier credencial privada debe vivir en un backend/proxy (ver AI.proxyUrl).
- */
-window.TAI = window.TAI || {};
-
-/** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '1.7.0';
-
-TAI.CONFIG = {
-  /* ------------------------------------------------------------------ */
-  /* API DE MERCADO (Deriv WebSocket público: solo lectura de ticks)      */
-  /* ------------------------------------------------------------------ */
-  API: {
-    websocketUrl: 'wss://ws.derivws.com/websockets/v3',
-    // Si un endpoint falla se rota al siguiente automáticamente
-    endpoints: [
-      'wss://ws.derivws.com/websockets/v3',
-      'wss://ws.binaryws.com/websockets/v3',
-      'wss://frontend.derivws.com/websockets/v3'
-    ],
-    pingIntervalMs: 25000,
-    // app_id público de demostración de Deriv. Reemplázalo por el tuyo.
-    // NO es un secreto: solo identifica la aplicación para datos públicos.
-    appId: '1089',
-    historyCount: 300,        // ticks iniciales que se solicitan
-    reconnectDelayMs: 2500,
-    maxReconnectDelayMs: 20000,
-    requestTimeoutMs: 12000
-  },
-
-  /* ------------------------------------------------------------------ */
-  /* IA                                                                  */
-  /* ------------------------------------------------------------------ */
-  AI: {
-    // 'LOCAL'  -> motor determinista incluido (analysis-engine.js)
-    // 'PROXY'  -> backend propio que reenvía a OpenAI/Anthropic/etc.
-    provider: 'LOCAL',
-    // Ejemplo: 'https://tu-backend.com/api/trading-ai'  (la API key vive ahí)
-    proxyUrl: '',
-    maxContextTicks: 120,
-    // Si el proxy falla, se usa el motor local en lugar de romper la app.
-    fallbackToLocal: true
-  },
-
-  /* ------------------------------------------------------------------ */
-  /* MERCADOS                                                            */
-  /* ------------------------------------------------------------------ */
-  MARKET: {
-    // Preferencia, no verdad absoluta: la lista real se pide al servidor
-    // con active_symbols. Si no llega, la app NO inventa códigos.
-    defaultSymbol: '1HZ75V',
-    requireServerSymbols: true,
-    minTicksForAnalysis: 25,
-    symbols: [
-      { code: 'R_10',    label: 'Volatility 10',        index: 10,  oneSecond: false, decimals: 3 },
-      { code: '1HZ10V',  label: 'Volatility 10 (1s)',   index: 10,  oneSecond: true,  decimals: 3 },
-      { code: 'R_25',    label: 'Volatility 25',        index: 25,  oneSecond: false, decimals: 3 },
-      { code: '1HZ25V',  label: 'Volatility 25 (1s)',   index: 25,  oneSecond: true,  decimals: 2 },
-      { code: 'R_50',    label: 'Volatility 50',        index: 50,  oneSecond: false, decimals: 4 },
-      { code: '1HZ50V',  label: 'Volatility 50 (1s)',   index: 50,  oneSecond: true,  decimals: 2 },
-      { code: 'R_75',    label: 'Volatility 75',        index: 75,  oneSecond: false, decimals: 4 },
-      { code: '1HZ75V',  label: 'Volatility 75 (1s)',   index: 75,  oneSecond: true,  decimals: 2 },
-      { code: 'R_100',   label: 'Volatility 100',       index: 100, oneSecond: false, decimals: 2 },
-      { code: '1HZ100V', label: 'Volatility 100 (1s)',  index: 100, oneSecond: true,  decimals: 2 }
-    ]
-  },
-
-  /* ------------------------------------------------------------------ */
-  /* APLICACIÓN                                                          */
-  /* ------------------------------------------------------------------ */
-  APP: {
-    simulationMode: true,      // arranca siempre en simulación
-    allowRealTrading: false,   // ninguna orden real puede enviarse desde aquí
-    countdownSeconds: 10,
-    autoBrief: true,             // al conectar, rellena el escenario sin esperar comandos
-    liveRefreshMs: 15000,        // refresco del escenario mientras no hay turno activo
-    historyLimit: 8,
-    lang: 'es-ES',
-    speechRate: 0.95,          // algo más lento: suena natural, no robótico
-    speechPitch: 1.12,         // tono ligeramente más alto
-    preferFemaleVoice: true,
-    conversationMode: true,    // un solo toque del micrófono y sigue escuchando
-    greeting: 'Hola, ¿cómo estás? ¿Quieres iniciar un análisis hoy?'
-  }
-};
-
-/** Devuelve la definición de un mercado por su código Deriv. */
-TAI.getSymbol = function (code) {
-  return TAI.CONFIG.MARKET.symbols.find(function (s) { return s.code === code; }) || null;
-};
 
 /* ==== js/market-api.js ==== */
 /**
@@ -2672,13 +2580,35 @@ TAI.getSymbol = function (code) {
 (function (TAI) {
   'use strict';
 
+  // Verde y rojo de TradingView
   var COLORS = {
-    up: '#2ee6a8',
-    down: '#ff5a76',
+    up: '#26a69a',
+    down: '#ef5350',
     flat: '#8ea0bd',
     grid: 'rgba(255,255,255,0.05)',
     axis: 'rgba(255,255,255,0.35)'
   };
+
+  /** Agrupa ticks en velas OHLC del tamaño configurado. */
+  function toCandles(ticks, seconds) {
+    var size = seconds || 5;
+    var out = [];
+    var actual = null;
+
+    (ticks || []).forEach(function (t) {
+      var bucket = Math.floor(t.time / size) * size;
+      if (!actual || actual.time !== bucket) {
+        actual = { time: bucket, open: t.price, high: t.price, low: t.price, close: t.price };
+        out.push(actual);
+      } else {
+        actual.high = Math.max(actual.high, t.price);
+        actual.low = Math.min(actual.low, t.price);
+        actual.close = t.price;
+      }
+    });
+
+    return out;
+  }
 
   /* ===================== motor TradingView Lightweight ===================== */
 
@@ -2723,19 +2653,20 @@ TAI.getSymbol = function (code) {
       localization: { locale: 'es-CO' }
     });
 
-    this.series = this.chart.addAreaSeries({
-      lineColor: COLORS.up,
-      lineWidth: 2,
-      topColor: 'rgba(46,230,168,0.28)',
-      bottomColor: 'rgba(46,230,168,0.02)',
+    this.candleSeconds = (TAI.CONFIG.APP && TAI.CONFIG.APP.candleSeconds) || 5;
+    this.current = null;
+
+    this.series = this.chart.addCandlestickSeries({
+      upColor: COLORS.up,
+      downColor: COLORS.down,
+      borderUpColor: COLORS.up,
+      borderDownColor: COLORS.down,
+      wickUpColor: COLORS.up,
+      wickDownColor: COLORS.down,
       priceLineVisible: true,
       priceLineWidth: 1,
       priceLineStyle: 2,
-      priceLineColor: COLORS.up,
       lastValueVisible: true,
-      crosshairMarkerVisible: true,
-      crosshairMarkerRadius: 4,
-      crosshairMarkerBackgroundColor: '#05080f',
       priceFormat: { type: 'price', precision: this.decimals, minMove: Math.pow(10, -this.decimals) }
     });
 
@@ -2751,17 +2682,6 @@ TAI.getSymbol = function (code) {
     }
   }
 
-  TVChart.prototype._recolor = function (lastPrice) {
-    if (this.firstPrice == null || lastPrice == null) return;
-    var rising = lastPrice >= this.firstPrice;
-    this.series.applyOptions({
-      lineColor: rising ? COLORS.up : COLORS.down,
-      topColor: rising ? 'rgba(46,230,168,0.28)' : 'rgba(255,90,118,0.28)',
-      bottomColor: rising ? 'rgba(46,230,168,0.02)' : 'rgba(255,90,118,0.02)',
-      priceLineColor: rising ? COLORS.up : COLORS.down
-    });
-  };
-
   TVChart.prototype.setData = function (ticks, decimals) {
     if (typeof decimals === 'number' && decimals !== this.decimals) {
       this.decimals = decimals;
@@ -2770,31 +2690,34 @@ TAI.getSymbol = function (code) {
       });
     }
 
-    // Lightweight Charts exige tiempos estrictamente ascendentes y únicos
-    var list = ticks || [];
-    var seen = Object.create(null);
-    for (var i = 0; i < list.length; i++) seen[list[i].time] = list[i].price;
-
-    var data = Object.keys(seen).map(Number).sort(function (a, b) { return a - b; })
-      .map(function (t) { return { time: t, value: seen[t] }; });
+    var data = toCandles(ticks, this.candleSeconds);
 
     this.series.setData(data);
-    this.lastTime = data.length ? data[data.length - 1].time : 0;
-    this.firstPrice = data.length ? data[0].value : null;
-    this._recolor(data.length ? data[data.length - 1].value : null);
+    this.current = data.length ? data[data.length - 1] : null;
+    this.lastTime = this.current ? this.current.time : 0;
     if (data.length) {
-      this._focusRecent(data.length, 90);
+      this._focusRecent(data.length, 60);
       this.chart.timeScale().scrollToRealTime();
     }
   };
 
   TVChart.prototype.push = function (tick) {
-    if (!tick || tick.time < this.lastTime) return;
-    if (this.firstPrice == null) this.firstPrice = tick.price;
-    this.series.update({ time: tick.time, value: tick.price });
-    this.lastTime = tick.time;
-    this._recolor(tick.price);
-    this.chart.timeScale().scrollToRealTime();   // la vista sigue al último tick
+    if (!tick) return;
+    var bucket = Math.floor(tick.time / this.candleSeconds) * this.candleSeconds;
+    if (bucket < this.lastTime) return;
+
+    if (!this.current || this.current.time !== bucket) {
+      // Vela nueva: abre en el precio del tick que la inicia
+      this.current = { time: bucket, open: tick.price, high: tick.price, low: tick.price, close: tick.price };
+      this.lastTime = bucket;
+    } else {
+      this.current.high = Math.max(this.current.high, tick.price);
+      this.current.low = Math.min(this.current.low, tick.price);
+      this.current.close = tick.price;
+    }
+
+    this.series.update(this.current);
+    this.chart.timeScale().scrollToRealTime();   // la vista sigue a la vela en curso
   };
 
   /** Deja a la vista los últimos N ticks para que el movimiento se note. */
@@ -2872,8 +2795,9 @@ TAI.getSymbol = function (code) {
     var W = this.width, H = this.height;
     ctx.clearRect(0, 0, W, H);
 
-    var data = this.ticks.slice(-this.visible);
-    if (data.length < 2) {
+    var candles = toCandles(this.ticks, (TAI.CONFIG.APP && TAI.CONFIG.APP.candleSeconds) || 5).slice(-60);
+
+    if (candles.length < 2) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.font = '13px "Space Grotesk", system-ui, sans-serif';
       ctx.textAlign = 'center';
@@ -2885,17 +2809,21 @@ TAI.getSymbol = function (code) {
     var plotW = W - padRight - padLeft;
     var plotH = H - padTop - padBottom;
 
-    var prices = data.map(function (d) { return d.price; });
-    var min = Math.min.apply(null, prices);
-    var max = Math.max.apply(null, prices);
+    var min = Infinity, max = -Infinity;
+    candles.forEach(function (c) {
+      if (c.low < min) min = c.low;
+      if (c.high > max) max = c.high;
+    });
     if (max === min) { max += 0.5; min -= 0.5; }
     var pad = (max - min) * 0.12;
     min -= pad; max += pad;
 
-    var x = function (i) { return padLeft + (i / (data.length - 1)) * plotW; };
+    var step = plotW / candles.length;
+    var bodyW = Math.max(2, Math.min(14, step * 0.62));
+    var x = function (i) { return padLeft + step * (i + 0.5); };
     var y = function (p) { return padTop + (1 - (p - min) / (max - min)) * plotH; };
 
-    // Rejilla + escala de precios
+    // Rejilla y escala de precios
     ctx.font = '11px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
     for (var g = 0; g <= 4; g++) {
@@ -2906,58 +2834,43 @@ TAI.getSymbol = function (code) {
       ctx.moveTo(padLeft, py + 0.5);
       ctx.lineTo(padLeft + plotW, py + 0.5);
       ctx.stroke();
-      var pv = max - ((max - min) * g) / 4;
       ctx.fillStyle = COLORS.axis;
-      ctx.fillText(this.formatPrice(pv), padLeft + plotW + 8, py + 4);
+      ctx.fillText(this.formatPrice(max - ((max - min) * g) / 4), padLeft + plotW + 8, py + 4);
     }
 
-    var rising = data[data.length - 1].price >= data[0].price;
-    var lineColor = rising ? COLORS.up : COLORS.down;
+    // Velas: verde si cierra por encima de su apertura, rojo si cierra por debajo
+    candles.forEach(function (c, i) {
+      var alcista = c.close >= c.open;
+      var color = alcista ? COLORS.up : COLORS.down;
+      var cx = x(i);
 
-    // Área bajo la curva
-    var grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
-    grad.addColorStop(0, rising ? 'rgba(46,230,168,0.28)' : 'rgba(255,90,118,0.28)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(cx) + 0.5, y(c.high));
+      ctx.lineTo(Math.round(cx) + 0.5, y(c.low));
+      ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(data[0].price));
-    for (var i = 1; i < data.length; i++) ctx.lineTo(x(i), y(data[i].price));
-    ctx.lineTo(x(data.length - 1), padTop + plotH);
-    ctx.lineTo(x(0), padTop + plotH);
-    ctx.closePath();
-    ctx.fillStyle = grad;
-    ctx.fill();
-
-    // Línea de precio
-    ctx.beginPath();
-    ctx.moveTo(x(0), y(data[0].price));
-    for (var j = 1; j < data.length; j++) ctx.lineTo(x(j), y(data[j].price));
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = 1.8;
-    ctx.lineJoin = 'round';
-    ctx.shadowColor = rising ? 'rgba(46,230,168,0.5)' : 'rgba(255,90,118,0.5)';
-    ctx.shadowBlur = 10;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+      var top = y(Math.max(c.open, c.close));
+      var alto = Math.max(1, Math.abs(y(c.open) - y(c.close)));
+      ctx.fillStyle = color;
+      ctx.fillRect(cx - bodyW / 2, top, bodyW, alto);
+    });
 
     // Último precio
-    var last = data[data.length - 1];
-    var lx = x(data.length - 1), ly = y(last.price);
+    var ultima = candles[candles.length - 1];
+    var ly = y(ultima.close);
+    var lineColor = ultima.close >= ultima.open ? COLORS.up : COLORS.down;
 
     ctx.setLineDash([3, 4]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
     ctx.beginPath();
     ctx.moveTo(padLeft, ly + 0.5);
     ctx.lineTo(padLeft + plotW, ly + 0.5);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = lineColor;
-    ctx.beginPath();
-    ctx.arc(lx, ly, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    var label = this.formatPrice(last.price);
+    var label = this.formatPrice(ultima.close);
     ctx.font = '600 11px ui-monospace, "JetBrains Mono", monospace';
     var tw = ctx.measureText(label).width + 12;
     var bx = Math.min(W - tw - 2, padLeft + plotW + 4);
@@ -2972,9 +2885,9 @@ TAI.getSymbol = function (code) {
     ctx.fillStyle = COLORS.axis;
     ctx.font = '10px ui-monospace, "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(timeLabel(data[0].time), padLeft, H - 6);
+    ctx.fillText(timeLabel(candles[0].time), padLeft, H - 6);
     ctx.textAlign = 'right';
-    ctx.fillText(timeLabel(last.time), padLeft + plotW, H - 6);
+    ctx.fillText(timeLabel(ultima.time), padLeft + plotW, H - 6);
   };
 
   function roundRect(ctx, x, y, w, h, r) {
