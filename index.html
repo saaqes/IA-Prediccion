@@ -36,7 +36,7 @@
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --dock-height: 168px;
+  --dock-height: 196px;
 
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -406,6 +406,30 @@ p { margin: 0; }
 
 .reason { font-size: 0.82rem; line-height: 1.55; color: var(--ink-dim); }
 
+/* -------------------------- configuración sugerida -------------------------- */
+
+.panel--config { border-color: rgba(139, 107, 255, 0.4); }
+.panel--config h2 { font-size: 0.95rem; margin-bottom: 6px; }
+.config-question { font-size: 0.85rem; color: var(--ink); line-height: 1.5; }
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.config-grid > div {
+  border: 1px solid var(--panel-line);
+  border-radius: var(--r-md);
+  padding: 9px 10px;
+  background: rgba(3, 6, 12, 0.35);
+}
+.config-grid dt { font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.config-grid dd { margin: 4px 0 0; font-family: var(--mono); font-size: 0.95rem; }
+
+.config-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.config-actions .btn { flex: 1 1 130px; }
+
 /* ---------------------------- confirmación ---------------------------- */
 
 .panel--confirm { border-color: rgba(255, 199, 102, 0.35); }
@@ -463,6 +487,99 @@ p { margin: 0; }
 }
 
 .cd-state { font-size: 0.8rem; color: var(--ink-dim); letter-spacing: 0.04em; }
+
+/* --------------------- capa de análisis sobre el gráfico --------------------- */
+
+.scan-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.scan-line {
+  stroke: rgba(139, 107, 255, 0.85);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px rgba(139, 107, 255, 0.8));
+  animation: scan-sweep linear forwards;
+}
+@keyframes scan-sweep {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--scan-width, 100%)); }
+}
+
+.swing__dot {
+  fill: #05080f;
+  stroke-width: 2;
+  animation: pop 0.35s ease-out;
+}
+.swing--high .swing__dot { stroke: var(--up); }
+.swing--low .swing__dot { stroke: var(--down); }
+.swing__label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  animation: fade-in 0.35s ease-out;
+}
+.swing--high .swing__label { fill: var(--up); }
+.swing--low .swing__label { fill: var(--down); }
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.3); transform-origin: center; }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.trendline {
+  stroke-width: 1.6;
+  fill: none;
+  transition: stroke-dashoffset 0.7s ease-out;
+}
+.trendline--up { stroke: var(--up); }
+.trendline--down { stroke: var(--down); }
+
+.level {
+  stroke-width: 1;
+  stroke-dasharray: 5 5;
+  animation: fade-in 0.4s ease-out;
+}
+.level--resistance { stroke: rgba(239, 83, 80, 0.75); }
+.level--support { stroke: rgba(38, 166, 154, 0.75); }
+.level__label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  fill: var(--ink-dim);
+  animation: fade-in 0.4s ease-out;
+}
+
+.scan-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 4;
+  pointer-events: none;
+  display: grid;
+  gap: 2px;
+  padding: 7px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(139, 107, 255, 0.4);
+  background: rgba(9, 12, 24, 0.82);
+  backdrop-filter: blur(6px);
+}
+.scan-badge__title {
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  color: var(--signal);
+  font-family: var(--mono);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.scan-badge__phase {
+  font-size: 0.72rem;
+  color: var(--ink);
+}
+.scan-badge__phase.is-in { animation: fade-in 0.4s ease-out; }
 
 /* --------------------------- tablas de mercado --------------------------- */
 
@@ -592,6 +709,65 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   50% { transform: scaleY(1); }
 }
 
+/* ------------------------------ IRIS / wake word ------------------------------ */
+
+.iris-halo {
+  position: absolute;
+  bottom: calc(64px + var(--safe-bottom));
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  border: 2px solid var(--signal);
+  pointer-events: none;
+  animation: iris-pop 1.1s ease-out;
+}
+@keyframes iris-pop {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  70% { transform: scale(2.4); opacity: 0.12; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+.wake-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 8px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+.wake-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.wake-toggle__track {
+  width: 34px;
+  height: 19px;
+  border-radius: 999px;
+  background: rgba(148, 178, 255, 0.16);
+  border: 1px solid var(--panel-line);
+  position: relative;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.wake-toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--ink-dim);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.wake-toggle input:checked + .wake-toggle__track {
+  background: rgba(139, 107, 255, 0.35);
+  border-color: rgba(139, 107, 255, 0.6);
+}
+.wake-toggle input:checked + .wake-toggle__track .wake-toggle__knob {
+  transform: translateX(15px);
+  background: var(--signal);
+}
+.wake-toggle input:focus-visible + .wake-toggle__track { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+.mic-dock { position: fixed; }
+
 /* -------------------------------- toast -------------------------------- */
 
 .toast {
@@ -623,7 +799,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   .chart-wrap { height: 380px; }
   .panel--chat { grid-column: 2; }
   .panel--analysis { grid-column: 1; }
-  .panel--confirm, .panel--countdown, .panel--history { grid-column: 2; }
+  .panel--confirm, .panel--countdown, .panel--history, .panel--config { grid-column: 2; }
   .panel--watch { grid-column: 1; }
   .panel--tv { grid-column: 2; }
   .mic-dock {
@@ -653,6 +829,10 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       <div class="status" id="aiStatus" data-tone="idle">
         <span class="status__dot" aria-hidden="true"></span>
         <span class="status__text">IA <b class="status-value">ACTIVA</b></span>
+      </div>
+      <div class="status" id="irisStatus" data-tone="idle">
+        <span class="status__dot" aria-hidden="true"></span>
+        <span class="status__text">IRIS <b class="status-value">EN ESPERA</b></span>
       </div>
       <div class="status" id="voiceStatus" data-tone="idle">
         <span class="status__dot" aria-hidden="true"></span>
@@ -755,6 +935,24 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       <p class="reason" id="resReason">Pulsa el micrófono y di «analiza Volatility 75 1s», o escríbelo en el cuadro de texto. El escenario aparecerá aquí con la dirección probable, la confianza estimada y el horizonte en ticks.</p>
     </section>
 
+    <!-- ----------------------- CONFIGURACIÓN SUGERIDA ----------------------- -->
+    <section class="panel panel--config" id="configPanel" hidden aria-label="Configuración del análisis">
+      <h2>Configuración sugerida</h2>
+      <p class="config-question" id="configQuestion">¿Con cuántos ticks quieres operar en tu Deriv y en qué volatilidad?</p>
+
+      <div class="config-grid">
+        <div><dt>Volatilidad</dt><dd id="cfgMarket">—</dd></div>
+        <div><dt>Ticks</dt><dd id="cfgTicks">—</dd></div>
+        <div><dt>Ventana de análisis</dt><dd id="cfgWindow">—</dd></div>
+      </div>
+
+      <div class="config-actions">
+        <button type="button" class="btn btn--primary" id="useRecBtn">Usar recomendación</button>
+        <button type="button" class="btn btn--ghost" id="changeCfgBtn">Cambiar</button>
+        <button type="button" class="btn btn--ghost" id="againBtn">Analizar de nuevo</button>
+      </div>
+    </section>
+
     <!-- --------------------------- CONFIRMACIÓN --------------------------- -->
     <section class="panel panel--confirm" id="confirmPanel" hidden aria-label="Confirmación de ejecución">
       <h2>Confirma la ejecución</h2>
@@ -826,6 +1024,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
   <!-- ------------------------------ MICRÓFONO ------------------------------ -->
   <div class="mic-dock">
+    <div class="iris-halo" id="irisHalo" hidden aria-hidden="true"></div>
     <div class="waves" id="waves" hidden aria-hidden="true">
       <span></span><span></span><span></span><span></span><span></span>
     </div>
@@ -835,8 +1034,14 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
         <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"></path>
       </svg>
     </button>
-    <p class="mic-state" id="micState">Hablar con Trading AI</p>
-    <p class="mic-hint" id="micHint">Pulsa una vez y quedo escuchando. Vuelve a pulsar para terminar.</p>
+    <p class="mic-state" id="micState">Hablar con IRIS</p>
+    <p class="mic-hint" id="micHint">Di «Iris» o pulsa el micrófono para hablar.</p>
+
+    <label class="wake-toggle">
+      <input type="checkbox" id="wakeToggle" checked>
+      <span class="wake-toggle__track" aria-hidden="true"><span class="wake-toggle__knob"></span></span>
+      <span class="wake-toggle__label">Activación por voz «Iris»</span>
+    </label>
   </div>
 
   <div class="toast" id="toast" role="alert" hidden></div>
@@ -846,6 +1051,97 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
   <script>
 /* ==== js/config.js ==== */
+/**
+ * config.js
+ * Configuración central de la aplicación. No contiene secretos.
+ * Cualquier credencial privada debe vivir en un backend/proxy (ver AI.proxyUrl).
+ */
+window.TAI = window.TAI || {};
+
+/** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
+TAI.VERSION = '2.0.0';
+
+TAI.CONFIG = {
+  /* ------------------------------------------------------------------ */
+  /* API DE MERCADO (Deriv WebSocket público: solo lectura de ticks)      */
+  /* ------------------------------------------------------------------ */
+  API: {
+    websocketUrl: 'wss://ws.derivws.com/websockets/v3',
+    // Si un endpoint falla se rota al siguiente automáticamente
+    endpoints: [
+      'wss://ws.derivws.com/websockets/v3',
+      'wss://ws.binaryws.com/websockets/v3',
+      'wss://frontend.derivws.com/websockets/v3'
+    ],
+    pingIntervalMs: 25000,
+    // app_id público de Deriv. Reemplázalo por el tuyo (app.deriv.com).
+    // NO es un secreto: solo identifica la aplicación para datos públicos.
+    appId: '1089',
+    historyCount: 300,
+    reconnectDelayMs: 2500,
+    maxReconnectDelayMs: 20000,
+    requestTimeoutMs: 12000
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* IA                                                                  */
+  /* ------------------------------------------------------------------ */
+  AI: {
+    // 'LOCAL' -> motor determinista incluido | 'PROXY' -> backend propio
+    provider: 'LOCAL',
+    proxyUrl: '',
+    maxContextTicks: 120,
+    fallbackToLocal: true
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* MERCADOS                                                            */
+  /* ------------------------------------------------------------------ */
+  MARKET: {
+    // Preferencia, no verdad absoluta: la lista real se pide al servidor
+    // con active_symbols. Si no llega, la app NO inventa códigos.
+    defaultSymbol: '1HZ75V',
+    requireServerSymbols: true,
+    minTicksForAnalysis: 25,
+    symbols: [
+      { code: 'R_10',    label: 'Volatility 10',       index: 10,  oneSecond: false, decimals: 3 },
+      { code: '1HZ10V',  label: 'Volatility 10 (1s)',  index: 10,  oneSecond: true,  decimals: 3 },
+      { code: 'R_25',    label: 'Volatility 25',       index: 25,  oneSecond: false, decimals: 3 },
+      { code: '1HZ25V',  label: 'Volatility 25 (1s)',  index: 25,  oneSecond: true,  decimals: 2 },
+      { code: 'R_50',    label: 'Volatility 50',       index: 50,  oneSecond: false, decimals: 4 },
+      { code: '1HZ50V',  label: 'Volatility 50 (1s)',  index: 50,  oneSecond: true,  decimals: 2 },
+      { code: 'R_75',    label: 'Volatility 75',       index: 75,  oneSecond: false, decimals: 4 },
+      { code: '1HZ75V',  label: 'Volatility 75 (1s)',  index: 75,  oneSecond: true,  decimals: 2 },
+      { code: 'R_100',   label: 'Volatility 100',      index: 100, oneSecond: false, decimals: 2 },
+      { code: '1HZ100V', label: 'Volatility 100 (1s)', index: 100, oneSecond: true,  decimals: 2 }
+    ]
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* APLICACIÓN                                                          */
+  /* ------------------------------------------------------------------ */
+  APP: {
+    simulationMode: true,       // arranca siempre en simulación
+    allowRealTrading: false,    // ninguna orden real puede enviarse desde aquí
+    countdownSeconds: 10,
+    autoBrief: true,            // al conectar, rellena el escenario sin esperar comandos
+    liveRefreshMs: 15000,
+    candleSeconds: 5,           // segundos que agrupa cada vela del gráfico
+    scanStepMs: 1300,           // duración de cada fase del escaneo visual
+    historyLimit: 8,
+    lang: 'es-ES',
+    speechRate: 0.95,
+    speechPitch: 1.12,
+    preferFemaleVoice: true,
+    conversationMode: true,
+    greeting: 'Hola, ¿cómo estás? ¿Quieres iniciar un análisis hoy?'
+  }
+};
+
+/** Devuelve la definición de un mercado por su código. */
+TAI.getSymbol = function (code) {
+  return TAI.CONFIG.MARKET.symbols.find(function (s) { return s.code === code; }) || null;
+};
 
 /* ==== js/market-api.js ==== */
 /**
@@ -1643,6 +1939,71 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     };
   }
 
+  /* ------------------- estructura de mercado (datos reales) ------------------- */
+
+  /**
+   * Pivotes reales: un tick es swing high si es el mayor de su entorno ±k.
+   * No se inventa ningún punto: todos salen de la serie recibida.
+   */
+  function findSwingPoints(ticks, k) {
+    var w = k || 3;
+    var out = [];
+    for (var i = w; i < ticks.length - w; i++) {
+      var p = ticks[i].price;
+      var esAlto = true, esBajo = true;
+      for (var j = i - w; j <= i + w; j++) {
+        if (j === i) continue;
+        if (ticks[j].price >= p) esAlto = false;
+        if (ticks[j].price <= p) esBajo = false;
+      }
+      if (esAlto) out.push({ index: i, time: ticks[i].time, price: p, type: 'HIGH' });
+      else if (esBajo) out.push({ index: i, time: ticks[i].time, price: p, type: 'LOW' });
+    }
+    return out.slice(-12);
+  }
+
+  /** Agrupa pivotes cercanos en niveles: más toques, más relevancia. */
+  function findLevels(swings, tipo, rango) {
+    var puntos = swings.filter(function (s) { return s.type === tipo; });
+    var tol = rango * 0.08;
+    var grupos = [];
+
+    puntos.forEach(function (p) {
+      var g = grupos.find(function (x) { return Math.abs(x.price - p.price) <= tol; });
+      if (g) {
+        g.touches++;
+        g.price = (g.price * (g.touches - 1) + p.price) / g.touches;
+        g.lastTime = p.time;
+      } else {
+        grupos.push({ price: p.price, touches: 1, lastTime: p.time, type: tipo });
+      }
+    });
+
+    return grupos
+      .sort(function (a, b) { return b.touches - a.touches; })
+      .slice(0, 2)
+      .map(function (g) {
+        return { price: g.price, touches: g.touches, kind: tipo === 'HIGH' ? 'RESISTANCE' : 'SUPPORT' };
+      });
+  }
+
+  /** Línea entre los dos últimos pivotes del mismo tipo. */
+  function buildTrendLines(swings) {
+    var lineas = [];
+    ['HIGH', 'LOW'].forEach(function (tipo) {
+      var p = swings.filter(function (s) { return s.type === tipo; }).slice(-2);
+      if (p.length === 2 && p[1].time !== p[0].time) {
+        lineas.push({
+          kind: tipo === 'HIGH' ? 'HIGHS' : 'LOWS',
+          from: { time: p[0].time, price: p[0].price },
+          to: { time: p[1].time, price: p[1].price },
+          rising: p[1].price > p[0].price
+        });
+      }
+    });
+    return lineas;
+  }
+
   /* --------------------------- interpretaciones --------------------------- */
 
   function trendLabel(m) {
@@ -1745,6 +2106,14 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     var recommendedTicks = calculateTicks(m);
     var horizonSeconds = Math.max(1, Math.round(recommendedTicks * m.tickInterval));
 
+    // Estructura real del precio: alimenta las animaciones del gráfico
+    var visibles = ticks.slice(-120);
+    var precios = visibles.map(function (t) { return t.price; });
+    var rango = Math.max.apply(null, precios) - Math.min.apply(null, precios) || 1;
+    var swingPoints = findSwingPoints(visibles, 3);
+    var resistencias = findLevels(swingPoints, 'HIGH', rango);
+    var soportes = findLevels(swingPoints, 'LOW', rango);
+
     return {
       ok: true,
       market: symbolDef.label,
@@ -1757,6 +2126,10 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       momentum: momentum,
       lastPrice: m.lastPrice,
       metrics: m,
+      swingPoints: swingPoints,
+      supportLevels: soportes,
+      resistanceLevels: resistencias,
+      trendLines: buildTrendLines(swingPoints),
       reason: buildReason(m, pred, trend, momentum),
       generatedAt: Date.now()
     };
@@ -1799,7 +2172,8 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     recommendVolatility: recommendVolatility,
     calculateTicks: calculateTicks,
     generatePrediction: generatePrediction,
-    computeMetrics: computeMetrics
+    computeMetrics: computeMetrics,
+    findSwingPoints: findSwingPoints
   };
 
   TAI.analyzeMarket = analyzeMarket;
@@ -1871,6 +2245,33 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     return match || null;
   }
 
+  var NUMEROS = { uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10 };
+
+  /** Extrae una cantidad de ticks de frases como «quiero 3 ticks» o «pon cinco». */
+  function extractTicks(text) {
+    var n = normalize(text);
+
+    var conPalabra = n.match(/\b(\d{1,2})\s*ticks?\b/) ||
+                     n.match(/\bticks?\s*(\d{1,2})\b/);
+    if (conPalabra) return clampTicks(Number(conPalabra[1]));
+
+    var literal = n.match(/\b(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s*ticks?\b/);
+    if (literal) return clampTicks(NUMEROS[literal[1]]);
+
+    var orden = n.match(/\b(pon|usa|quiero|dame|coloca|deja|sube a|baja a)\s+(?:en\s+)?(\d{1,2})\b/);
+    if (orden) return clampTicks(Number(orden[2]));
+
+    var ordenLiteral = n.match(/\b(pon|usa|quiero|dame|coloca)\s+(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b/);
+    if (ordenLiteral) return clampTicks(NUMEROS[ordenLiteral[2]]);
+
+    return null;
+  }
+
+  function clampTicks(v) {
+    if (!v || isNaN(v)) return null;
+    return Math.max(1, Math.min(10, Math.round(v)));
+  }
+
   /* --------------------------- detección de intención --------------------------- */
 
   function detectIntent(text) {
@@ -1881,6 +2282,12 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     if (/^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hey|que tal|que mas|como estas|como te va|quien eres)\b/.test(n)) return 'GREETING';
     if (/^(gracias|muchas gracias|perfecto|genial|excelente|listo|vale)\b/.test(n) && n.length < 24) return 'THANKS';
     if (/^(no|nada|ahora no|todavia no|luego|despues|mas tarde)\b/.test(n) && n.length < 20) return 'DECLINE';
+
+    if (extractTicks(n) && !/(analiza|analizar|analisis)/.test(n)) return 'SET_TICKS';
+
+    if (/^(si|sii|claro|dale|correcto|confirmo|de acuerdo|esa|esa misma|usa esa|usala|perfecto)\b/.test(n) && n.length < 26) return 'CONFIRM';
+
+    if (/^(cambiar|cambia|cambio|modificar|modifica|otra configuracion|prefiero otra)\b/.test(n)) return 'CHANGE';
 
     if (/(analiza|analizar|analisis|analicemos).*(opera|operar|ejecuta|ejecutar|entra)/.test(n) ||
         /(opera|ejecuta).*(analisis|analiza)/.test(n)) return 'ANALYZE_AND_EXECUTE';
@@ -1971,6 +2378,23 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
         'Sin problema. Aquí sigo leyendo el mercado por si cambias de idea.'
       ]);
       return { intent: 'decline', speech: no, text: no };
+    }
+
+    if (intent === 'SET_TICKS') {
+      var t2 = extractTicks(ctx.userQuestion);
+      var msg2 = t2
+        ? 'Anotado: ' + t2 + (t2 === 1 ? ' tick' : ' ticks') + '.'
+        : 'No entendí cuántos ticks quieres. Dime por ejemplo: tres ticks.';
+      return { intent: 'set_ticks', ticksRequested: t2, speech: msg2, text: msg2 };
+    }
+
+    if (intent === 'CONFIRM') {
+      return { intent: 'confirm', speech: '', text: '' };
+    }
+
+    if (intent === 'CHANGE') {
+      var ch = 'Claro. Dime cuántos ticks quieres y en qué volatilidad. Por ejemplo: tres ticks en Volatility 50 de un segundo.';
+      return { intent: 'change_config', speech: ch, text: ch };
     }
 
     if (intent === 'HELP') {
@@ -2110,6 +2534,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
   TAI.AIEngine = {
     askTradingAI: askTradingAI,
+    extractTicks: extractTicks,
     detectIntent: detectIntent,
     detectMarket: detectMarket,
     isTradingRelated: isTradingRelated,
@@ -2497,6 +2922,165 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   TAI.speakAI = function (text, opts) { return TAI.Voice.speak(text, opts); };
 })(window.TAI);
 
+/* ==== js/wake-word.js ==== */
+/**
+ * wake-word.js
+ * Palabra de activación "Iris" y máquina de estados de la conversación por voz.
+ *
+ * No abre el micrófono por su cuenta: usa la sesión de reconocimiento de voice.js.
+ * Si el navegador no permite reconocimiento continuo, el estado real se refleja
+ * en la interfaz; nunca se finge que está escuchando.
+ *
+ * Estados:
+ *   IDLE → LISTENING_FOR_WAKE_WORD → WAKE_WORD_DETECTED
+ *        → LISTENING_FOR_COMMAND → PROCESSING → (app) → WAITING
+ */
+(function (TAI) {
+  'use strict';
+
+  var STATES = {
+    IDLE: 'IDLE',
+    LISTENING_FOR_WAKE_WORD: 'LISTENING_FOR_WAKE_WORD',
+    WAKE_WORD_DETECTED: 'WAKE_WORD_DETECTED',
+    LISTENING_FOR_COMMAND: 'LISTENING_FOR_COMMAND',
+    PROCESSING: 'PROCESSING'
+  };
+
+  // Variantes que suele devolver el reconocimiento para «Iris»
+  var WAKE_PATTERN = /\b(iris|irís|iri|irix|iriz|hiris|iribs|aires|irs)\b/;
+
+  function normalize(text) {
+    return (text || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[¿?¡!.,;:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function WakeWord() {
+    this._handlers = {};
+    this.enabled = true;
+    this.state = STATES.IDLE;
+    this.commandTimeoutMs = 12000;
+    this._commandTimer = null;
+  }
+
+  WakeWord.prototype.on = function (evt, cb) {
+    (this._handlers[evt] = this._handlers[evt] || []).push(cb);
+    return this;
+  };
+  WakeWord.prototype.emit = function (evt, payload) {
+    (this._handlers[evt] || []).forEach(function (cb) {
+      try { cb(payload); } catch (e) { console.error('[WakeWord]', evt, e); }
+    });
+  };
+
+  WakeWord.prototype.setState = function (next) {
+    if (this.state === next) return;
+    this.state = next;
+    this.emit('state', { state: next });
+  };
+
+  /** ¿La transcripción contiene la palabra de activación? */
+  WakeWord.prototype.containsWakeWord = function (transcript) {
+    return WAKE_PATTERN.test(normalize(transcript));
+  };
+
+  /** Devuelve el comando sin la palabra de activación ni conectores sobrantes. */
+  WakeWord.prototype.stripWakeWord = function (transcript) {
+    return normalize(transcript)
+      .replace(WAKE_PATTERN, ' ')
+      .replace(/^\s*(por favor|oye|hey|ya|ok)\s+/, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  /**
+   * Enruta una transcripción final.
+   * @returns {Object} { action: 'ignore'|'activate'|'command', command }
+   */
+  WakeWord.prototype.route = function (transcript, micAbierto) {
+    var texto = (transcript || '').trim();
+    if (!texto) return { action: 'ignore' };
+
+    var tieneWake = this.enabled && this.containsWakeWord(texto);
+
+    // Micrófono abierto manualmente: todo lo dicho es un comando
+    if (micAbierto && !tieneWake) {
+      this.clearCommandTimer();
+      this.setState(STATES.PROCESSING);
+      return { action: 'command', command: texto, wakeWord: null };
+    }
+
+    if (tieneWake) {
+      var resto = this.stripWakeWord(texto);
+      this.setState(STATES.WAKE_WORD_DETECTED);
+      this.emit('activated', { transcript: texto });
+
+      if (resto.length >= 3) {
+        this.clearCommandTimer();
+        this.setState(STATES.PROCESSING);
+        return { action: 'command', command: resto, wakeWord: 'iris' };
+      }
+
+      this.startCommandWindow();
+      return { action: 'activate', wakeWord: 'iris' };
+    }
+
+    // Ventana abierta tras decir solo «Iris»
+    if (this.state === STATES.LISTENING_FOR_COMMAND) {
+      this.clearCommandTimer();
+      this.setState(STATES.PROCESSING);
+      return { action: 'command', command: texto, wakeWord: 'iris' };
+    }
+
+    return { action: 'ignore' };
+  };
+
+  /** Abre la ventana en la que se espera la orden tras la activación. */
+  WakeWord.prototype.startCommandWindow = function () {
+    var self = this;
+    this.clearCommandTimer();
+    this.setState(STATES.LISTENING_FOR_COMMAND);
+
+    this._commandTimer = setTimeout(function () {
+      self._commandTimer = null;
+      if (self.state === STATES.LISTENING_FOR_COMMAND) {
+        self.setState(self.enabled ? STATES.LISTENING_FOR_WAKE_WORD : STATES.IDLE);
+        self.emit('timeout', {});
+      }
+    }, this.commandTimeoutMs);
+  };
+
+  WakeWord.prototype.clearCommandTimer = function () {
+    if (this._commandTimer) clearTimeout(this._commandTimer);
+    this._commandTimer = null;
+  };
+
+  /** Vuelve al estado de espera de la palabra de activación. */
+  WakeWord.prototype.waiting = function () {
+    this.clearCommandTimer();
+    this.setState(this.enabled ? STATES.LISTENING_FOR_WAKE_WORD : STATES.IDLE);
+  };
+
+  WakeWord.prototype.setEnabled = function (on) {
+    this.enabled = !!on;
+    this.clearCommandTimer();
+    this.setState(this.enabled ? STATES.LISTENING_FOR_WAKE_WORD : STATES.IDLE);
+    this.emit('enabled', { enabled: this.enabled });
+  };
+
+  WakeWord.prototype.STATES = STATES;
+
+  TAI.WakeWord = new WakeWord();
+
+  /* Alias legibles de la arquitectura solicitada */
+  TAI.detectWakeWord = function (t) { return TAI.WakeWord.containsWakeWord(t); };
+  TAI.startWakeWordDetection = function () { TAI.WakeWord.setEnabled(true); };
+  TAI.stopWakeWordDetection = function () { TAI.WakeWord.setEnabled(false); };
+})(window.TAI);
+
 /* ==== js/countdown.js ==== */
 /**
  * countdown.js
@@ -2720,6 +3304,23 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     this.chart.timeScale().scrollToRealTime();   // la vista sigue a la vela en curso
   };
 
+  /**
+   * Conversores precio/tiempo → píxeles, usando la propia escala del gráfico.
+   * La capa de análisis dibuja sobre coordenadas reales, no aproximadas.
+   */
+  TVChart.prototype.coords = function () {
+    var self = this;
+    return {
+      width: this.container.clientWidth,
+      height: this.container.clientHeight,
+      priceToY: function (price) { return self.series.priceToCoordinate(price); },
+      timeToX: function (time) {
+        var bucket = Math.floor(time / self.candleSeconds) * self.candleSeconds;
+        return self.chart.timeScale().timeToCoordinate(bucket);
+      }
+    };
+  };
+
   /** Deja a la vista los últimos N ticks para que el movimiento se note. */
   TVChart.prototype._focusRecent = function (total, visible) {
     if (total < 5) return;
@@ -2819,6 +3420,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     min -= pad; max += pad;
 
     var step = plotW / candles.length;
+    this._scale = { min: min, max: max, padTop: padTop, plotH: plotH, padLeft: padLeft, step: step, firstTime: candles[0].time, size: (TAI.CONFIG.APP && TAI.CONFIG.APP.candleSeconds) || 5 };
     var bodyW = Math.max(2, Math.min(14, step * 0.62));
     var x = function (i) { return padLeft + step * (i + 0.5); };
     var y = function (p) { return padTop + (1 - (p - min) / (max - min)) * plotH; };
@@ -2890,6 +3492,24 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     ctx.fillText(timeLabel(ultima.time), padLeft + plotW, H - 6);
   };
 
+  TickChart.prototype.coords = function () {
+    var s = this._scale;
+    var self = this;
+    if (!s) return null;
+    return {
+      width: this.width,
+      height: this.height,
+      priceToY: function (price) {
+        return s.padTop + (1 - (price - s.min) / (s.max - s.min)) * s.plotH;
+      },
+      timeToX: function (time) {
+        var bucket = Math.floor(time / s.size) * s.size;
+        var i = (bucket - s.firstTime) / s.size;
+        return s.padLeft + s.step * (i + 0.5);
+      }
+    };
+  };
+
   function roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -2928,6 +3548,240 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   };
 })(window.TAI);
 
+/* ==== js/analysis-overlay.js ==== */
+/**
+ * analysis-overlay.js
+ * Capa visual del proceso de análisis, dibujada en SVG sobre el gráfico.
+ *
+ * IMPORTANTE: esta capa no inventa nada. Cada punto, línea y nivel que dibuja
+ * proviene del resultado del motor de análisis (swingPoints, trendLines,
+ * supportLevels, resistanceLevels) calculado con los ticks reales.
+ *
+ * API:
+ *   runAnalysisAnimation(chart, analysis, onPhase) -> Promise
+ *   animateMarketScanner() / animateSwingPoints() / animateTrendLines()
+ *   animateSupportResistance() / animateAnalysisProgress() / clearAnalysisOverlay()
+ */
+(function (TAI) {
+  'use strict';
+
+  var NS = 'http://www.w3.org/2000/svg';
+
+  var state = {
+    host: null,
+    svg: null,
+    badge: null,
+    chart: null,
+    coords: null,
+    timers: [],
+    running: false
+  };
+
+  function el(tag, attrs) {
+    var node = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+    return node;
+  }
+
+  function later(fn, ms) {
+    var id = setTimeout(fn, ms);
+    state.timers.push(id);
+    return id;
+  }
+
+  function ensureLayer(chart, host) {
+    state.chart = chart;
+    state.host = host;
+
+    if (!state.svg || state.svg.parentNode !== host) {
+      clearAnalysisOverlay();
+      state.svg = el('svg', { class: 'scan-layer' });
+      host.appendChild(state.svg);
+
+      state.badge = document.createElement('div');
+      state.badge.className = 'scan-badge';
+      state.badge.innerHTML = '<span class="scan-badge__title">● AI ANALYZING</span><span class="scan-badge__phase"></span>';
+      host.appendChild(state.badge);
+    }
+
+    var w = host.clientWidth, h = host.clientHeight;
+    state.svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    state.svg.setAttribute('width', w);
+    state.svg.setAttribute('height', h);
+    state.size = { w: w, h: h };
+    state.coords = chart && chart.coords ? chart.coords() : null;
+  }
+
+  /** Coordenada segura: descarta lo que caiga fuera del área visible. */
+  function xy(time, price) {
+    if (!state.coords) return null;
+    var x = state.coords.timeToX(time);
+    var y = state.coords.priceToY(price);
+    if (x == null || y == null || isNaN(x) || isNaN(y)) return null;
+    if (x < 0 || x > state.size.w || y < 0 || y > state.size.h) return null;
+    return { x: x, y: y };
+  }
+
+  /* ------------------------------- fases ------------------------------- */
+
+  /** Línea vertical que recorre las velas de izquierda a derecha. */
+  function animateMarketScanner(durationMs) {
+    if (!state.svg) return;
+    var linea = el('line', {
+      class: 'scan-line',
+      x1: 0, y1: 0, x2: 0, y2: state.size.h
+    });
+    state.svg.appendChild(linea);
+    linea.style.animationDuration = (durationMs || 5000) + 'ms';
+    linea.style.setProperty('--scan-width', state.size.w + 'px');
+  }
+
+  /** Marca los máximos y mínimos detectados, uno tras otro. */
+  function animateSwingPoints(points) {
+    if (!state.svg || !points) return;
+    var visibles = points.slice(-8);
+
+    visibles.forEach(function (p, i) {
+      later(function () {
+        var c = xy(p.time, p.price);
+        if (!c) return;
+        var g = el('g', { class: 'swing swing--' + (p.type === 'HIGH' ? 'high' : 'low') });
+        g.appendChild(el('circle', { cx: c.x, cy: c.y, r: 4.5, class: 'swing__dot' }));
+        var t = el('text', { x: c.x + 8, y: c.y + (p.type === 'HIGH' ? -7 : 13), class: 'swing__label' });
+        t.textContent = p.type === 'HIGH' ? 'HIGH' : 'LOW';
+        g.appendChild(t);
+        state.svg.appendChild(g);
+      }, i * 110);
+    });
+  }
+
+  /** Traza las líneas entre pivotes del mismo tipo, como si las dibujara a mano. */
+  function animateTrendLines(lines) {
+    if (!state.svg || !lines) return;
+
+    lines.forEach(function (l, i) {
+      later(function () {
+        var a = xy(l.from.time, l.from.price);
+        var b = xy(l.to.time, l.to.price);
+        if (!a || !b) return;
+
+        var linea = el('line', {
+          x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+          class: 'trendline trendline--' + (l.rising ? 'up' : 'down')
+        });
+        var largo = Math.hypot(b.x - a.x, b.y - a.y);
+        linea.style.strokeDasharray = largo;
+        linea.style.strokeDashoffset = largo;
+        state.svg.appendChild(linea);
+        requestAnimationFrame(function () { linea.style.strokeDashoffset = '0'; });
+      }, i * 260);
+    });
+  }
+
+  /** Líneas horizontales de soporte y resistencia. */
+  function animateSupportResistance(levels) {
+    if (!state.svg || !levels) return;
+
+    levels.forEach(function (lv, i) {
+      later(function () {
+        if (!state.coords) return;
+        var y = state.coords.priceToY(lv.price);
+        if (y == null || isNaN(y) || y < 0 || y > state.size.h) return;
+
+        var esResistencia = lv.kind === 'RESISTANCE';
+        var linea = el('line', {
+          x1: 0, y1: y, x2: state.size.w, y2: y,
+          class: 'level level--' + (esResistencia ? 'resistance' : 'support')
+        });
+        state.svg.appendChild(linea);
+
+        var t = el('text', { x: 8, y: y - 6, class: 'level__label' });
+        t.textContent = (esResistencia ? 'RESISTENCIA' : 'SOPORTE') + ' · ' + lv.touches + ' toques';
+        state.svg.appendChild(t);
+      }, i * 200);
+    });
+  }
+
+  /** Texto de fase bajo el rótulo AI ANALYZING. */
+  function animateAnalysisProgress(text) {
+    if (!state.badge) return;
+    var node = state.badge.querySelector('.scan-badge__phase');
+    node.textContent = text;
+    node.classList.remove('is-in');
+    void node.offsetWidth;
+    node.classList.add('is-in');
+  }
+
+  function clearAnalysisOverlay() {
+    state.timers.forEach(clearTimeout);
+    state.timers = [];
+    state.running = false;
+    if (state.svg && state.svg.parentNode) state.svg.parentNode.removeChild(state.svg);
+    if (state.badge && state.badge.parentNode) state.badge.parentNode.removeChild(state.badge);
+    state.svg = null;
+    state.badge = null;
+  }
+
+  /**
+   * Secuencia completa. Devuelve una promesa que resuelve al terminar.
+   * @param {Object} chart  instancia devuelta por TAI.createChart
+   * @param {HTMLElement} host contenedor del gráfico
+   * @param {Object} analysis resultado de analyzeMarket (datos reales)
+   */
+  function runAnalysisAnimation(chart, host, analysis) {
+    clearAnalysisOverlay();
+    ensureLayer(chart, host);
+    state.running = true;
+
+    var paso = (TAI.CONFIG.APP && TAI.CONFIG.APP.scanStepMs) || 1300;
+    var total = paso * 5;
+
+    animateMarketScanner(total);
+    animateAnalysisProgress('Analizando acción del precio…');
+
+    return new Promise(function (resolve) {
+      later(function () {
+        animateAnalysisProgress('Identificando máximos y mínimos…');
+        animateSwingPoints(analysis.swingPoints);
+      }, paso);
+
+      later(function () {
+        animateAnalysisProgress('Midiendo momentum…');
+      }, paso * 2);
+
+      later(function () {
+        animateAnalysisProgress('Revisando la tendencia…');
+        animateTrendLines(analysis.trendLines);
+      }, paso * 3);
+
+      later(function () {
+        animateAnalysisProgress('Marcando soportes y resistencias…');
+        animateSupportResistance((analysis.supportLevels || []).concat(analysis.resistanceLevels || []));
+      }, paso * 4);
+
+      later(function () {
+        animateAnalysisProgress('Calculando la probabilidad…');
+      }, paso * 4.6);
+
+      later(function () {
+        state.running = false;
+        resolve();
+      }, total);
+    });
+  }
+
+  TAI.AnalysisOverlay = {
+    runAnalysisAnimation: runAnalysisAnimation,
+    animateMarketScanner: animateMarketScanner,
+    animateSwingPoints: animateSwingPoints,
+    animateTrendLines: animateTrendLines,
+    animateSupportResistance: animateSupportResistance,
+    animateAnalysisProgress: animateAnalysisProgress,
+    clearAnalysisOverlay: clearAnalysisOverlay,
+    isRunning: function () { return state.running; }
+  };
+})(window.TAI);
+
 /* ==== js/ui.js ==== */
 /**
  * ui.js
@@ -2943,7 +3797,8 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
   function cacheElements() {
     [
-      'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus',
+      'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus', 'irisStatus',
+      'wakeToggle', 'irisHalo',
       'marketSelect', 'sourceSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
       'mdLast', 'mdHigh', 'mdLow', 'mdRange', 'mdVol', 'mdTrend', 'mdCount', 'mdInterval',
       'feedText', 'reconnectBtn', 'watchBody', 'tvWidget', 'appVersion',
@@ -2952,7 +3807,9 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       'resTicks', 'resDuration', 'resTrend', 'resMomentum', 'resVolatility', 'resReason',
       'countdownCard', 'countdownValue', 'countdownRing', 'cdMarket', 'cdDirection', 'cdTicks', 'cdState',
       'historyList', 'toast', 'confirmPanel', 'confirmDetails', 'confirmAccept', 'confirmCancel',
-      'textInput', 'sendBtn', 'talkAgainBtn'
+      'textInput', 'sendBtn', 'talkAgainBtn',
+      'configPanel', 'configQuestion', 'cfgMarket', 'cfgTicks', 'cfgWindow',
+      'useRecBtn', 'changeCfgBtn', 'againBtn'
     ].forEach(function (id) { el[id] = $(id); });
   }
 
@@ -2960,11 +3817,16 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     api: { connecting: 'CONECTANDO', connected: 'CONECTADO', disconnected: 'SIN CONEXIÓN', error: 'ERROR' },
     ai: { online: 'ACTIVA', thinking: 'ANALIZANDO', offline: 'FUERA DE LÍNEA' },
     voice: { ready: 'LISTA', listening: 'ESCUCHANDO', speaking: 'HABLANDO', unsupported: 'NO DISPONIBLE' },
-    analysis: { waiting: 'EN ESPERA', running: 'EN CURSO', done: 'EJECUTADO', blocked: 'SIN DATOS' }
+    analysis: { waiting: 'EN ESPERA', running: 'EN CURSO', done: 'EJECUTADO', blocked: 'SIN DATOS' },
+    iris: {
+      waiting: 'EN ESPERA', activated: 'ACTIVADA', listening: 'ESCUCHANDO',
+      processing: 'PROCESANDO', analyzing: 'ANALIZANDO', speaking: 'RESPONDIENDO', off: 'DESACTIVADA'
+    }
   };
 
   var STATUS_TONE = {
-    connected: 'ok', online: 'ok', ready: 'ok', done: 'ok',
+    connected: 'ok', online: 'ok', ready: 'ok', done: 'ok', activated: 'ok',
+    processing: 'warn', analyzing: 'warn', off: 'idle',
     connecting: 'warn', thinking: 'warn', listening: 'warn', speaking: 'warn', running: 'warn',
     disconnected: 'bad', error: 'bad', offline: 'bad', unsupported: 'bad', blocked: 'bad',
     waiting: 'idle'
@@ -3160,7 +4022,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     wrap.className = 'msg msg--' + role;
     var who = document.createElement('span');
     who.className = 'msg__who';
-    who.textContent = role === 'user' ? 'Tú' : 'Trading AI';
+    who.textContent = role === 'user' ? 'Tú' : 'IRIS';
     var body = document.createElement('p');
     body.className = 'msg__body';
     body.textContent = text;
@@ -3171,12 +4033,12 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   }
 
   var MIC_COPY = {
-    idle: { state: 'Hablar con Trading AI', hint: 'Pulsa una vez y quedo escuchando. Vuelve a pulsar para terminar.' },
-    listening: { state: 'Te escucho…', hint: 'Habla con normalidad. Sigo escuchando entre respuestas.' },
-    processing: { state: 'Procesando…', hint: 'Interpretando tu petición.' },
-    analyzing: { state: 'Analizando mercado…', hint: 'Leyendo los ticks recibidos.' },
-    speaking: { state: 'Trading AI responde…', hint: 'Pulsa el micrófono para interrumpir.' },
-    finished: { state: 'Análisis ejecutado', hint: '¿Quieres hacer otro análisis? Solo dímelo.' }
+    idle: { state: 'Hablar con IRIS', hint: 'Di «Iris» o pulsa el micrófono para hablar.' },
+    listening: { state: 'IRIS está escuchando…', hint: 'Habla con normalidad. Sigo escuchando entre respuestas.' },
+    processing: { state: 'IRIS está procesando…', hint: 'Interpretando tu petición.' },
+    analyzing: { state: 'IRIS está analizando el mercado…', hint: 'Escaneando la estructura del precio.' },
+    speaking: { state: 'IRIS está respondiendo…', hint: 'Pulsa el micrófono para interrumpir.' },
+    finished: { state: 'Análisis ejecutado', hint: 'Di «Iris, haz otro análisis» cuando quieras.' }
   };
 
   function setMicState(state) {
@@ -3187,6 +4049,16 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     if (el.micHint) el.micHint.textContent = copy.hint;
     if (el.waves) el.waves.hidden = state !== 'listening';
     el.micBtn.setAttribute('aria-pressed', state === 'listening' ? 'true' : 'false');
+  }
+
+  /** Halo de activación cuando se detecta «Iris». */
+  function flashIris() {
+    if (!el.irisHalo) return;
+    el.irisHalo.hidden = false;
+    el.irisHalo.classList.remove('is-on');
+    void el.irisHalo.offsetWidth;
+    el.irisHalo.classList.add('is-on');
+    setTimeout(function () { el.irisHalo.hidden = true; }, 1100);
   }
 
   function setInterim(text) {
@@ -3283,6 +4155,25 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     }, 4200);
   }
 
+  /** Panel de configuración sugerida tras el análisis. */
+  function showConfig(info) {
+    if (!el.configPanel) return;
+    el.configPanel.hidden = false;
+    el.cfgMarket.textContent = info.market;
+    el.cfgTicks.textContent = info.ticks;
+    el.cfgWindow.textContent = info.window + ' s';
+    if (info.question) el.configQuestion.textContent = info.question;
+  }
+
+  function updateConfigTicks(ticks) {
+    if (el.cfgTicks) el.cfgTicks.textContent = ticks;
+    if (el.resTicks) el.resTicks.textContent = ticks;
+  }
+
+  function hideConfig() {
+    if (el.configPanel) el.configPanel.hidden = true;
+  }
+
   function showConfirm(info, onAccept, onCancel) {
     if (!el.confirmPanel) return;
     el.confirmPanel.hidden = false;
@@ -3323,6 +4214,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     renderWatchlist: renderWatchlist,
     mountTradingViewWidget: mountTradingViewWidget,
     setInterim: setInterim,
+    flashIris: flashIris,
     renderAnalysis: renderAnalysis,
     showCountdown: showCountdown,
     updateCountdown: updateCountdown,
@@ -3330,6 +4222,9 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     hideCountdown: hideCountdown,
     addHistory: addHistory,
     toast: toast,
+    showConfig: showConfig,
+    updateConfigTicks: updateConfigTicks,
+    hideConfig: hideConfig,
     showConfirm: showConfirm,
     hideConfirm: hideConfirm
   };
@@ -3347,6 +4242,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   var CFG = TAI.CONFIG;
   var UI = TAI.UI;
   var Voice = TAI.Voice;
+  var Wake = TAI.WakeWord;
   var Market = TAI.MarketAPI;      // proveedor activo; se puede cambiar en caliente
 
   var state = {
@@ -3361,6 +4257,9 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     autoBriefDone: false,
     lastTickAt: 0,
     provider: 'deriv',
+    ticks: null,             // ticks elegidos por el usuario en esta conversación
+    awaitingConfig: false,   // esperando que confirme o cambie la configuración
+    wakeOn: true,            // detección de la palabra «Iris»
     lastLiveRefresh: 0,
     silenceStreak: 0,    // turnos seguidos sin escuchar nada
     greeted: false
@@ -3378,6 +4277,13 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     UI.setStatus('ai', 'online');
     UI.setStatus('analysis', 'waiting');
     UI.setStatus('voice', Voice.supported ? 'ready' : 'unsupported');
+    UI.setStatus('iris', Voice.supported ? 'waiting' : 'off');
+
+    if (!Voice.supported) {
+      state.wakeOn = false;
+      if (UI.el.wakeToggle) { UI.el.wakeToggle.checked = false; UI.el.wakeToggle.disabled = true; }
+    }
+    Wake.setEnabled(state.wakeOn);
 
     if (!state.chart) {
       UI.el.chart.innerHTML = '';                 // evita gráficos duplicados al recargar
@@ -3416,11 +4322,18 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       if (state.greeted) return;
       state.greeted = true;
       Voice.unlock();
-      Voice.speak(text);
+      Voice.speak(text).then(function () { startWakeListening(); });
     }
 
     document.addEventListener('pointerdown', speakGreeting, { once: false });
     document.addEventListener('keydown', speakGreeting, { once: false });
+  }
+
+  /** Escucha de fondo para detectar «Iris». Requiere permiso: se pide una vez. */
+  function startWakeListening() {
+    if (!state.wakeOn || !Voice.supported) return;
+    if (Voice.listening || Voice.speaking) return;
+    Voice.startListening();
   }
 
   /* ------------------------------- interfaz ------------------------------- */
@@ -3466,6 +4379,39 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       useProvider(e.target.value);
     });
 
+    UI.el.wakeToggle.addEventListener('change', function (e) {
+      state.wakeOn = e.target.checked;
+      Wake.setEnabled(state.wakeOn);
+      UI.setStatus('iris', state.wakeOn ? 'waiting' : 'off');
+
+      if (state.wakeOn) {
+        Voice.unlock();
+        startWakeListening();
+        UI.toast('Activación por voz encendida. Di «Iris» para empezar.');
+      } else if (!state.micOpen) {
+        Voice.stopListening();
+        UI.toast('Activación por voz apagada. Usa el micrófono para hablar.');
+      }
+    });
+
+    UI.el.useRecBtn.addEventListener('click', function () {
+      Voice.unlock();
+      confirmConfig();
+    });
+
+    UI.el.changeCfgBtn.addEventListener('click', function () {
+      Voice.unlock();
+      state.awaitingConfig = true;
+      say('Claro. Dime cuántos ticks quieres y en qué volatilidad. Por ejemplo: tres ticks en Volatility 50 de un segundo.');
+    });
+
+    UI.el.againBtn.addEventListener('click', function () {
+      Voice.unlock();
+      UI.hideConfig();
+      state.awaitingConfig = false;
+      handleUserInput('analiza el mercado');
+    });
+
     UI.el.reconnectBtn.addEventListener('click', function () {
       UI.setFeedText('Reconectando con el mercado…');
       Market.reconnectNow();
@@ -3495,6 +4441,8 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       UI.setStatus('voice', 'ready');
       if (state.busy) return;
 
+      if (state.wakeOn && !state.micOpen) { resumeListening(); return; }
+
       if (state.micOpen) {
         state.silenceStreak++;
         if (state.silenceStreak > 8) {
@@ -3510,13 +4458,46 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
     Voice.on('final', function (p) {
       state.silenceStreak = 0;
-      handleUserInput(p.text);
+      var ruta = Wake.route(p.text, state.micOpen);
+
+      if (ruta.action === 'command') {
+        UI.setStatus('iris', 'processing');
+        handleUserInput(ruta.command);
+        return;
+      }
+
+      if (ruta.action === 'activate') {
+        UI.flashIris();
+        UI.setStatus('iris', 'activated');
+        UI.addMessage('user', p.text);
+        say('Te escucho. ¿Qué quieres analizar?').then(function () {
+          UI.setStatus('iris', 'listening');
+          UI.setMicState('listening');
+          resumeListening();
+        });
+        return;
+      }
+
+      // Sin palabra de activación y sin ventana abierta: no se interpreta nada
+      UI.setInterim('');
+    });
+
+    Wake.on('timeout', function () {
+      UI.setStatus('iris', state.wakeOn ? 'waiting' : 'off');
+      UI.setMicState('idle');
     });
 
     Voice.on('error', function (p) {
       UI.toast(p.message);
       UI.setMicState('idle');
       UI.setStatus('voice', Voice.supported ? 'ready' : 'unsupported');
+    UI.setStatus('iris', Voice.supported ? 'waiting' : 'off');
+
+    if (!Voice.supported) {
+      state.wakeOn = false;
+      if (UI.el.wakeToggle) { UI.el.wakeToggle.checked = false; UI.el.wakeToggle.disabled = true; }
+    }
+    Wake.setEnabled(state.wakeOn);
     });
 
     Voice.on('speakstart', function () { UI.setStatus('voice', 'speaking'); });
@@ -3525,10 +4506,11 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
   /** Reabre el micrófono si la conversación sigue activa. */
   function resumeListening() {
-    if (!state.micOpen || !Voice.supported) return;
+    if (!Voice.supported) return;
+    if (!state.micOpen && !state.wakeOn) return;
     if (Voice.listening || Voice.speaking) return;
     setTimeout(function () {
-      if (state.micOpen && !Voice.listening && !Voice.speaking) {
+      if ((state.micOpen || state.wakeOn) && !Voice.listening && !Voice.speaking) {
         Voice.startListening({ skipPermission: Voice.permissionGranted });
       }
     }, 400);
@@ -3537,16 +4519,23 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   function closeMic() {
     state.micOpen = false;
     state.silenceStreak = 0;
-    Voice.stopListening();
     Voice.cancelSpeech();
-    Voice.releaseMicrophone();      // el permiso ya quedó concedido: no se volverá a pedir
+    if (state.wakeOn) {
+      Voice.stopListening();
+      resumeListening();            // sigue atenta a «Iris»
+    } else {
+      Voice.stopListening();
+      Voice.releaseMicrophone();    // el permiso ya quedó concedido: no se volverá a pedir
+    }
     UI.setMicState('idle');
+    UI.setStatus('iris', state.wakeOn ? 'waiting' : 'off');
   }
 
   function say(text) {
     UI.addMessage('ai', text);
     state.conversation.push({ role: 'assistant', content: text });
     UI.setMicState('speaking');
+    UI.setStatus('iris', 'speaking');
     Voice.mute(true);                       // evita que la IA se transcriba a sí misma
     return Voice.speak(text).then(function () {
       Voice.mute(false);
@@ -3793,6 +4782,13 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     var intent = TAI.AIEngine.detectIntent(text);
     var detected = TAI.AIEngine.detectMarket(text);
 
+    // «sí», «usa esa» mientras hay una configuración propuesta: se confirma y arranca
+    if (state.awaitingConfig && (intent === 'CONFIRM' || intent === 'REPEAT') && state.pendingConfig) {
+      state.busy = false;
+      confirmConfig();
+      return;
+    }
+
     // Fuera de tema: respuesta exacta, sin análisis ni datos
     if (intent === 'OFF_TOPIC') {
       return say(TAI.AIEngine.OFF_TOPIC_REPLY).then(function () { finishTurn('idle'); });
@@ -3888,8 +4884,24 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
           });
       }
 
+      if (result.intent === 'set_ticks') {
+        if (result.ticksRequested) {
+          state.ticks = result.ticksRequested;
+          UI.updateConfigTicks(state.ticks);
+          if (state.lastAnalysis) state.lastAnalysis.ticks = state.ticks;
+          return say(result.speech + ' ¿Confirmo la configuración y arranco la ventana de análisis?')
+            .then(function () { state.awaitingConfig = true; finishTurn('idle'); });
+        }
+        return say(result.speech).then(function () { finishTurn('idle'); });
+      }
+
+      if (result.intent === 'change_config') {
+        state.awaitingConfig = true;
+        return say(result.speech).then(function () { finishTurn('idle'); });
+      }
+
       if (result.intent === 'market_analysis' || result.intent === 'prediction') {
-        return say(result.speech).then(function () { runCountdown(result); });
+        return runAnalysisFlow(result);
       }
 
       // recommend_ticks, market_state, help, risk, off_topic, error
@@ -3898,11 +4910,78 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     });
   }
 
+  /* ------------------- flujo visual del análisis ------------------- */
+
+  /**
+   * Escaneo animado sobre el gráfico → resultado → recomendación de configuración.
+   * Las animaciones se alimentan de los puntos reales calculados por el motor.
+   */
+  function runAnalysisFlow(result) {
+    var analysis = result.analysis || state.lastAnalysis;
+    UI.setStatus('analysis', 'running');
+    UI.setStatus('iris', 'analyzing');
+    UI.setMicState('analyzing');
+
+    var animacion = analysis && TAI.AnalysisOverlay
+      ? TAI.AnalysisOverlay.runAnalysisAnimation(state.chart, UI.el.chart, analysis)
+      : Promise.resolve();
+
+    return Promise.all([animacion, say('Analizando mercado, por favor espera.')])
+      .then(function () {
+        TAI.AnalysisOverlay.clearAnalysisOverlay();
+        UI.renderAnalysis(analysis);
+
+        var ticks = state.ticks || result.ticks;
+        state.pendingConfig = {
+          market: result.market,
+          direction: result.direction,
+          ticks: ticks,
+          confidence: result.confidence,
+          duration: CFG.APP.countdownSeconds
+        };
+
+        UI.showConfig({
+          market: result.market,
+          ticks: ticks,
+          window: CFG.APP.countdownSeconds,
+          question: '¿Con cuántos ticks quieres operar en tu Deriv y en qué volatilidad?'
+        });
+
+        state.awaitingConfig = true;
+
+        return say(result.speech + ' Según el análisis, mi escenario estimado sería ' +
+          TAI.AIEngine.spokenMarket(result.market) + ' con ' + ticks + (ticks === 1 ? ' tick' : ' ticks') +
+          '. ¿Con cuántos ticks quieres operar en tu Deriv y en qué volatilidad? Puedes decir «usa esa» para aceptar mi recomendación.');
+      })
+      .then(function () { finishTurn('idle'); });
+  }
+
+  /** El usuario acepta la configuración: se explica el horizonte y arranca el reloj. */
+  function confirmConfig() {
+    var cfg = state.pendingConfig;
+    if (!cfg) return;
+
+    state.awaitingConfig = false;
+    state.busy = true;
+    state.busySince = Date.now();
+    UI.hideConfig();
+
+    var ticks = state.ticks || cfg.ticks;
+    cfg.ticks = ticks;
+
+    say('Perfecto. Utilizaremos ' + ticks + (ticks === 1 ? ' tick' : ' ticks') + ' en ' +
+      TAI.AIEngine.spokenMarket(cfg.market) + '. Voy a usar un horizonte de análisis de ' +
+      CFG.APP.countdownSeconds + ' segundos. Cuando la cuenta llegue a cero habrá terminado este periodo. Comenzando ahora.')
+      .then(function () { runCountdown(cfg); });
+  }
+
   /* ----------------------------- cuenta regresiva ----------------------------- */
 
   function runCountdown(result) {
     state.busy = true;
+    state.busySince = Date.now();
     UI.setStatus('analysis', 'running');
+    if (TAI.AnalysisOverlay) TAI.AnalysisOverlay.clearAnalysisOverlay();
     UI.showCountdown({
       market: result.market,
       direction: result.direction,
@@ -3922,6 +5001,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
           confidence: result.confidence,
           time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
         });
+        state.pendingConfig = null;
         say('Análisis ejecutado. ¿Quieres hacer otro análisis?').then(function () {
           finishTurn('finished');
         });
@@ -3933,6 +5013,8 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     state.busy = false;
     state.busySince = 0;
     UI.setStatus('ai', 'online');
+    Wake.waiting();
+    UI.setStatus('iris', state.wakeOn ? 'waiting' : 'off');
     UI.setMicState(micState || 'idle');
 
     if (state.pendingInput) {
@@ -3966,7 +5048,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  TAI.App = { state: state, handleUserInput: handleUserInput, switchMarket: switchMarket, closeMic: closeMic };
+  TAI.App = { state: state, confirmConfig: confirmConfig, handleUserInput: handleUserInput, switchMarket: switchMarket, closeMic: closeMic };
 })(window.TAI);
 
   </script>
