@@ -488,6 +488,132 @@ p { margin: 0; }
 
 .cd-state { font-size: 0.8rem; color: var(--ink-dim); letter-spacing: 0.04em; }
 
+/* ----------------------- panel flotante de IRIS ----------------------- */
+
+.chart-stage { position: relative; }
+
+.iris-panel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 6;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(139, 107, 255, 0.32);
+  background: rgba(10, 14, 26, 0.62);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+  animation: iris-panel-in 260ms ease-out;
+  pointer-events: none;
+}
+@keyframes iris-panel-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.iris-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.iris-panel__title {
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--signal);
+  font-family: var(--mono);
+}
+.iris-panel__phase { font-size: 0.7rem; color: var(--ink-dim); }
+
+.iris-panel__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.iris-panel__grid dt {
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.iris-panel__grid dd {
+  margin: 3px 0 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  transition: color 0.3s ease;
+}
+.iris-panel__grid dd.is-new { animation: fade-in 0.45s ease-out; color: var(--signal); }
+
+.iris-panel__confhead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.iris-panel__confhead b { font-family: var(--mono); color: var(--ink); letter-spacing: 0; }
+.iris-panel__track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 178, 255, 0.14);
+  overflow: hidden;
+  margin: 6px 0 10px;
+}
+.iris-panel__track span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--signal), var(--up));
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.iris-panel__result { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.iris-panel__label {
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.iris-panel__value {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+.iris-panel__value[data-dir="up"] { color: var(--up); }
+.iris-panel__value[data-dir="down"] { color: var(--down); }
+.iris-panel__value.is-new { animation: pop 0.4s ease-out; }
+
+.iris-panel__timer {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 178, 255, 0.12);
+}
+.iris-panel__count {
+  font-family: var(--mono);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.iris-panel[data-state="signal"] { border-color: rgba(38, 166, 154, 0.45); }
+.iris-panel[data-state="countdown"] { border-color: rgba(255, 199, 102, 0.45); }
+.iris-panel[data-state="finished"] { border-color: var(--panel-line); }
+
+@media (min-width: 900px) {
+  .iris-panel { right: auto; width: 320px; }
+}
+
 /* --------------------- capa de análisis sobre el gráfico --------------------- */
 
 .scan-layer {
@@ -554,9 +680,27 @@ p { margin: 0; }
   animation: fade-in 0.4s ease-out;
 }
 
+.target { stroke-width: 1.4; transition: stroke-dashoffset 0.6s ease-out; }
+.target--entry { stroke: var(--signal); }
+.target--tp { stroke: var(--up); }
+.target--sl { stroke: var(--down); stroke-dasharray: 4 4; }
+.target__dot { stroke-width: 2; fill: #05080f; animation: pop 0.35s ease-out; }
+.target__dot--entry { stroke: var(--signal); }
+.target__dot--tp { stroke: var(--up); }
+.target__dot--sl { stroke: var(--down); }
+.target__label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  animation: fade-in 0.4s ease-out;
+}
+.target__label--entry { fill: var(--signal); }
+.target__label--tp { fill: var(--up); }
+.target__label--sl { fill: var(--down); }
+
 .scan-badge {
   position: absolute;
-  top: 10px;
+  bottom: 10px;
   left: 10px;
   z-index: 4;
   pointer-events: none;
@@ -875,7 +1019,40 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
         </div>
       </div>
 
-      <div class="chart-wrap" id="chart" aria-label="Gráfico de precio en vivo"></div>
+      <div class="chart-stage">
+        <div class="chart-wrap" id="chart" aria-label="Gráfico de precio en vivo"></div>
+
+        <!-- Panel flotante de IRIS, superpuesto al gráfico -->
+        <section class="iris-panel" id="irisPanel" hidden data-state="idle" aria-live="polite">
+          <header class="iris-panel__head">
+            <span class="iris-panel__title">IRIS · Análisis de mercado</span>
+            <span class="iris-panel__phase" id="irisPhase">Analizando…</span>
+          </header>
+
+          <div class="iris-panel__grid">
+            <div><dt>Volatility</dt><dd id="irisMarket">—</dd></div>
+            <div><dt>Tick</dt><dd id="irisTicks">—</dd></div>
+          </div>
+
+          <div class="iris-panel__conf">
+            <div class="iris-panel__confhead">
+              <span>Confianza</span>
+              <b id="irisConfValue">—%</b>
+            </div>
+            <div class="iris-panel__track"><span id="irisConfBar"></span></div>
+          </div>
+
+          <div class="iris-panel__result">
+            <span class="iris-panel__label">Resultado</span>
+            <span class="iris-panel__value" id="irisResult" data-dir="flat">Analizando…</span>
+          </div>
+
+          <div class="iris-panel__timer" id="irisTimer" hidden>
+            <span class="iris-panel__label">Tienes</span>
+            <span class="iris-panel__count" id="irisCount">10</span>
+          </div>
+        </section>
+      </div>
 
       <dl class="marketdata" id="marketData">
         <div><dt>Último</dt><dd id="mdLast">—</dd></div>
@@ -1059,7 +1236,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.0.0';
+TAI.VERSION = '1.9.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -2079,6 +2256,45 @@ TAI.getSymbol = function (code) {
     return parts.join('; ') + '.';
   }
 
+  /**
+   * Entrada, objetivo e invalidación derivados de los niveles reales.
+   * Si no hay nivel cercano se usa el recorrido esperado por volatilidad.
+   */
+  function buildTargets(lastPrice, direction, m, soportes, resistencias, ticksHorizonte) {
+    var recorrido = lastPrice * (m.volatility / 100) * Math.sqrt(Math.max(1, ticksHorizonte)) * 1.2;
+    if (!isFinite(recorrido) || recorrido <= 0) recorrido = lastPrice * 0.0005;
+
+    var arriba = resistencias
+      .map(function (r) { return r.price; })
+      .filter(function (p) { return p > lastPrice; })
+      .sort(function (a, b) { return a - b; })[0];
+
+    var abajo = soportes
+      .map(function (r) { return r.price; })
+      .filter(function (p) { return p < lastPrice; })
+      .sort(function (a, b) { return b - a; })[0];
+
+    if (direction === 'PUT') {
+      return {
+        entry: lastPrice,
+        target: abajo != null ? abajo : lastPrice - recorrido,
+        invalidation: arriba != null ? arriba : lastPrice + recorrido,
+        fromLevels: abajo != null
+      };
+    }
+
+    if (direction === 'CALL') {
+      return {
+        entry: lastPrice,
+        target: arriba != null ? arriba : lastPrice + recorrido,
+        invalidation: abajo != null ? abajo : lastPrice - recorrido,
+        fromLevels: arriba != null
+      };
+    }
+
+    return { entry: lastPrice, target: null, invalidation: null, fromLevels: false };
+  }
+
   /* ------------------------------- API pública ------------------------------- */
 
   function analyzeMarket(input) {
@@ -2126,6 +2342,7 @@ TAI.getSymbol = function (code) {
       momentum: momentum,
       lastPrice: m.lastPrice,
       metrics: m,
+      targets: buildTargets(m.lastPrice, pred.direction, m, soportes, resistencias, recommendedTicks),
       swingPoints: swingPoints,
       supportLevels: soportes,
       resistanceLevels: resistencias,
@@ -3308,6 +3525,13 @@ TAI.getSymbol = function (code) {
    * Conversores precio/tiempo → píxeles, usando la propia escala del gráfico.
    * La capa de análisis dibuja sobre coordenadas reales, no aproximadas.
    */
+  /** Reserva espacio superior para que el panel de IRIS no tape las velas. */
+  TVChart.prototype.setTopSpace = function (on) {
+    this.chart.applyOptions({
+      rightPriceScale: { scaleMargins: { top: on ? 0.38 : 0.14, bottom: 0.12 } }
+    });
+  };
+
   TVChart.prototype.coords = function () {
     var self = this;
     return {
@@ -3406,7 +3630,7 @@ TAI.getSymbol = function (code) {
       return;
     }
 
-    var padRight = 62, padTop = 14, padBottom = 22, padLeft = 6;
+    var padRight = 62, padTop = this.topSpace ? 96 : 14, padBottom = 22, padLeft = 6;
     var plotW = W - padRight - padLeft;
     var plotH = H - padTop - padBottom;
 
@@ -3490,6 +3714,11 @@ TAI.getSymbol = function (code) {
     ctx.fillText(timeLabel(candles[0].time), padLeft, H - 6);
     ctx.textAlign = 'right';
     ctx.fillText(timeLabel(ultima.time), padLeft + plotW, H - 6);
+  };
+
+  TickChart.prototype.setTopSpace = function (on) {
+    this.topSpace = !!on;
+    this.requestDraw();
   };
 
   TickChart.prototype.coords = function () {
@@ -3702,6 +3931,45 @@ TAI.getSymbol = function (code) {
     });
   }
 
+  /**
+   * Marca la entrada, el objetivo y la invalidación sobre el gráfico.
+   * Los precios vienen del motor: niveles reales o recorrido esperado.
+   */
+  function animateEntryTargets(targets, direction) {
+    if (!state.svg || !targets || !state.coords) return;
+
+    var filas = [
+      { price: targets.entry, label: 'ENTRY', cls: 'entry' },
+      { price: targets.target, label: 'TP', cls: 'tp' },
+      { price: targets.invalidation, label: 'SL', cls: 'sl' }
+    ].filter(function (f) { return f.price != null; });
+
+    filas.forEach(function (f, i) {
+      later(function () {
+        var y = state.coords.priceToY(f.price);
+        if (y == null || isNaN(y) || y < 0 || y > state.size.h) return;
+
+        var x0 = state.size.w * 0.45;
+        var linea = el('line', {
+          x1: x0, y1: y, x2: state.size.w - 4, y2: y,
+          class: 'target target--' + f.cls
+        });
+        var largo = state.size.w - 4 - x0;
+        linea.style.strokeDasharray = largo;
+        linea.style.strokeDashoffset = largo;
+        state.svg.appendChild(linea);
+        requestAnimationFrame(function () { linea.style.strokeDashoffset = '0'; });
+
+        var t = el('text', { x: x0 + 6, y: y - 5, class: 'target__label target__label--' + f.cls });
+        t.textContent = f.label;
+        state.svg.appendChild(t);
+
+        var punto = el('circle', { cx: x0, cy: y, r: 3.5, class: 'target__dot target__dot--' + f.cls });
+        state.svg.appendChild(punto);
+      }, i * 320);
+    });
+  }
+
   /** Texto de fase bajo el rótulo AI ANALYZING. */
   function animateAnalysisProgress(text) {
     if (!state.badge) return;
@@ -3776,6 +4044,7 @@ TAI.getSymbol = function (code) {
     animateSwingPoints: animateSwingPoints,
     animateTrendLines: animateTrendLines,
     animateSupportResistance: animateSupportResistance,
+    animateEntryTargets: animateEntryTargets,
     animateAnalysisProgress: animateAnalysisProgress,
     clearAnalysisOverlay: clearAnalysisOverlay,
     isRunning: function () { return state.running; }
@@ -3799,6 +4068,8 @@ TAI.getSymbol = function (code) {
     [
       'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus', 'irisStatus',
       'wakeToggle', 'irisHalo',
+      'irisPanel', 'irisPhase', 'irisMarket', 'irisTicks', 'irisConfValue', 'irisConfBar',
+      'irisResult', 'irisTimer', 'irisCount',
       'marketSelect', 'sourceSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
       'mdLast', 'mdHigh', 'mdLow', 'mdRange', 'mdVol', 'mdTrend', 'mdCount', 'mdInterval',
       'feedText', 'reconnectBtn', 'watchBody', 'tvWidget', 'appVersion',
@@ -4051,6 +4322,99 @@ TAI.getSymbol = function (code) {
     el.micBtn.setAttribute('aria-pressed', state === 'listening' ? 'true' : 'false');
   }
 
+  /* ------------------------ panel flotante de IRIS ------------------------ */
+
+  var RESULT_COPY = { CALL: 'CALL', PUT: 'PUT', WAIT: 'ESPERAR' };
+  var confAnim = null;
+
+  function marcarNuevo(node) {
+    if (!node) return;
+    node.classList.remove('is-new');
+    void node.offsetWidth;
+    node.classList.add('is-new');
+  }
+
+  /** Abre el panel en blanco: los datos se rellenan según IRIS los va diciendo. */
+  function openIrisPanel() {
+    if (!el.irisPanel) return;
+    el.irisPanel.hidden = false;
+    el.irisPanel.dataset.state = 'analyzing';
+    el.irisMarket.textContent = '—';
+    el.irisTicks.textContent = '—';
+    el.irisConfValue.textContent = '—%';
+    el.irisConfBar.style.width = '0%';
+    el.irisResult.textContent = 'Analizando…';
+    el.irisResult.dataset.dir = 'flat';
+    el.irisTimer.hidden = true;
+    setIrisPhase('Analizando estructura…');
+  }
+
+  function setIrisPhase(text) {
+    if (el.irisPhase) el.irisPhase.textContent = text;
+  }
+
+  function setIrisState(state) {
+    if (el.irisPanel) el.irisPanel.dataset.state = state;
+  }
+
+  function setIrisMarket(label) {
+    if (!el.irisMarket) return;
+    el.irisMarket.textContent = label;
+    marcarNuevo(el.irisMarket);
+  }
+
+  function setIrisTicks(ticks) {
+    if (!el.irisTicks) return;
+    el.irisTicks.textContent = ticks;
+    marcarNuevo(el.irisTicks);
+  }
+
+  /** La barra sube por tramos hasta el valor final, con el número acompañando. */
+  function animateConfidence(target) {
+    if (!el.irisConfBar) return;
+    clearInterval(confAnim);
+
+    var actual = 0;
+    el.irisConfBar.style.width = '0%';
+    el.irisConfValue.textContent = '0%';
+
+    confAnim = setInterval(function () {
+      actual += Math.max(1, Math.round((target - actual) / 6));
+      if (actual >= target) { actual = target; clearInterval(confAnim); }
+      el.irisConfBar.style.width = actual + '%';
+      el.irisConfValue.textContent = actual + '%';
+    }, 60);
+  }
+
+  function setIrisResult(direction) {
+    if (!el.irisResult) return;
+    el.irisResult.textContent = RESULT_COPY[direction] || 'ESPERAR';
+    el.irisResult.dataset.dir = direction === 'CALL' ? 'up' : direction === 'PUT' ? 'down' : 'flat';
+    marcarNuevo(el.irisResult);
+    setIrisState('signal');
+    setIrisPhase('Análisis completado');
+  }
+
+  function setIrisCountdown(remaining) {
+    if (!el.irisTimer) return;
+    el.irisTimer.hidden = false;
+    el.irisCount.textContent = remaining;
+    setIrisState('countdown');
+  }
+
+  function finishIrisPanel() {
+    setIrisState('finished');
+    setIrisPhase('Análisis ejecutado');
+  }
+
+  function closeIrisPanel() {
+    clearInterval(confAnim);
+    if (el.irisPanel) {
+      el.irisPanel.hidden = true;
+      el.irisPanel.dataset.state = 'idle';
+    }
+  }
+
   /** Halo de activación cuando se detecta «Iris». */
   function flashIris() {
     if (!el.irisHalo) return;
@@ -4215,6 +4579,16 @@ TAI.getSymbol = function (code) {
     mountTradingViewWidget: mountTradingViewWidget,
     setInterim: setInterim,
     flashIris: flashIris,
+    openIrisPanel: openIrisPanel,
+    setIrisPhase: setIrisPhase,
+    setIrisState: setIrisState,
+    setIrisMarket: setIrisMarket,
+    setIrisTicks: setIrisTicks,
+    animateConfidence: animateConfidence,
+    setIrisResult: setIrisResult,
+    setIrisCountdown: setIrisCountdown,
+    finishIrisPanel: finishIrisPanel,
+    closeIrisPanel: closeIrisPanel,
     renderAnalysis: renderAnalysis,
     showCountdown: showCountdown,
     updateCountdown: updateCountdown,
@@ -4913,8 +5287,8 @@ TAI.getSymbol = function (code) {
   /* ------------------- flujo visual del análisis ------------------- */
 
   /**
-   * Escaneo animado sobre el gráfico → resultado → recomendación de configuración.
-   * Las animaciones se alimentan de los puntos reales calculados por el motor.
+   * Escaneo animado + narración sincronizada: cada frase que dice IRIS
+   * actualiza el campo correspondiente del panel justo antes de pronunciarla.
    */
   function runAnalysisFlow(result) {
     var analysis = result.analysis || state.lastAnalysis;
@@ -4922,16 +5296,57 @@ TAI.getSymbol = function (code) {
     UI.setStatus('iris', 'analyzing');
     UI.setMicState('analyzing');
 
-    var animacion = analysis && TAI.AnalysisOverlay
-      ? TAI.AnalysisOverlay.runAnalysisAnimation(state.chart, UI.el.chart, analysis)
-      : Promise.resolve();
+    UI.openIrisPanel();
+    if (state.chart.setTopSpace) state.chart.setTopSpace(true);
 
-    return Promise.all([animacion, say('Analizando mercado, por favor espera.')])
+    var ticks = state.ticks || result.ticks;
+
+    if (analysis && TAI.AnalysisOverlay) {
+      TAI.AnalysisOverlay.runAnalysisAnimation(state.chart, UI.el.chart, analysis);
+    }
+
+    // Guion: [texto que se pronuncia, efecto visual que lo acompaña]
+    var guion = [
+      {
+        texto: 'Analizando el mercado, por favor espera.',
+        efecto: function () { UI.setIrisPhase('Leyendo la estructura del precio…'); }
+      },
+      {
+        texto: 'Estamos en ' + TAI.AIEngine.spokenMarket(result.market) + '.',
+        efecto: function () { UI.setIrisMarket(result.market); }
+      },
+      {
+        texto: 'La tendencia es ' + result.trend + ' y el momentum ' + result.momentum + '.',
+        efecto: function () { UI.setIrisPhase('Tendencia ' + result.trend + ' · momentum ' + result.momentum); }
+      },
+      {
+        texto: 'El horizonte que veo es de ' + ticks + (ticks === 1 ? ' tick' : ' ticks') + '.',
+        efecto: function () { UI.setIrisTicks(ticks); }
+      },
+      {
+        texto: 'La probabilidad estimada es del ' + result.confidence + ' por ciento.',
+        efecto: function () {
+          UI.setIrisPhase('Calculando la probabilidad…');
+          UI.animateConfidence(result.confidence);
+        }
+      },
+      {
+        texto: result.direction === 'WAIT'
+          ? 'No veo dirección clara: el escenario estimado es esperar.'
+          : 'El escenario probable es ' + result.direction + '.',
+        efecto: function () {
+          UI.setIrisResult(result.direction);
+          if (analysis && analysis.targets && TAI.AnalysisOverlay) {
+            TAI.AnalysisOverlay.animateEntryTargets(analysis.targets, result.direction);
+          }
+        }
+      }
+    ];
+
+    return narrar(guion)
       .then(function () {
-        TAI.AnalysisOverlay.clearAnalysisOverlay();
         UI.renderAnalysis(analysis);
 
-        var ticks = state.ticks || result.ticks;
         state.pendingConfig = {
           market: result.market,
           direction: result.direction,
@@ -4949,11 +5364,21 @@ TAI.getSymbol = function (code) {
 
         state.awaitingConfig = true;
 
-        return say(result.speech + ' Según el análisis, mi escenario estimado sería ' +
-          TAI.AIEngine.spokenMarket(result.market) + ' con ' + ticks + (ticks === 1 ? ' tick' : ' ticks') +
-          '. ¿Con cuántos ticks quieres operar en tu Deriv y en qué volatilidad? Puedes decir «usa esa» para aceptar mi recomendación.');
+        return say('¿Con cuántos ticks quieres operar en tu Deriv y en qué volatilidad? ' +
+          'Puedes decir «usa esa» para aceptar mi recomendación de ' + ticks +
+          (ticks === 1 ? ' tick' : ' ticks') + '.');
       })
       .then(function () { finishTurn('idle'); });
+  }
+
+  /** Pronuncia el guion paso a paso, aplicando cada efecto antes de hablar. */
+  function narrar(pasos) {
+    return pasos.reduce(function (cadena, paso) {
+      return cadena.then(function () {
+        paso.efecto();
+        return say(paso.texto);
+      });
+    }, Promise.resolve());
   }
 
   /** El usuario acepta la configuración: se explica el horizonte y arranca el reloj. */
@@ -4970,8 +5395,11 @@ TAI.getSymbol = function (code) {
     cfg.ticks = ticks;
 
     say('Perfecto. Utilizaremos ' + ticks + (ticks === 1 ? ' tick' : ' ticks') + ' en ' +
-      TAI.AIEngine.spokenMarket(cfg.market) + '. Voy a usar un horizonte de análisis de ' +
-      CFG.APP.countdownSeconds + ' segundos. Cuando la cuenta llegue a cero habrá terminado este periodo. Comenzando ahora.')
+      TAI.AIEngine.spokenMarket(cfg.market) + '.')
+      .then(function () {
+        UI.setIrisCountdown(CFG.APP.countdownSeconds);
+        return say('Tienes ' + CFG.APP.countdownSeconds + ' segundos, empezando ahora.');
+      })
       .then(function () { runCountdown(cfg); });
   }
 
@@ -4981,7 +5409,6 @@ TAI.getSymbol = function (code) {
     state.busy = true;
     state.busySince = Date.now();
     UI.setStatus('analysis', 'running');
-    if (TAI.AnalysisOverlay) TAI.AnalysisOverlay.clearAnalysisOverlay();
     UI.showCountdown({
       market: result.market,
       direction: result.direction,
@@ -4990,7 +5417,10 @@ TAI.getSymbol = function (code) {
 
     TAI.startCountdown({
       seconds: CFG.APP.countdownSeconds,
-      onTick: function (remaining, progress) { UI.updateCountdown(remaining, progress); },
+      onTick: function (remaining, progress) {
+        UI.updateCountdown(remaining, progress);
+        UI.setIrisCountdown(remaining);
+      },
       onDone: function () {
         UI.finishCountdown();
         UI.setStatus('analysis', 'done');
@@ -5002,6 +5432,13 @@ TAI.getSymbol = function (code) {
           time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
         });
         state.pendingConfig = null;
+        UI.finishIrisPanel();
+        if (TAI.AnalysisOverlay) TAI.AnalysisOverlay.clearAnalysisOverlay();
+        setTimeout(function () {
+          UI.closeIrisPanel();
+          if (state.chart.setTopSpace) state.chart.setTopSpace(false);
+        }, 3500);
+
         say('Análisis ejecutado. ¿Quieres hacer otro análisis?').then(function () {
           finishTurn('finished');
         });
