@@ -66,6 +66,81 @@ body {
 h1, h2 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; }
 
+/* -------------------------- pantalla de inicio -------------------------- */
+
+body.is-booting { overflow: hidden; }
+
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(900px 600px at 50% 32%, rgba(139, 107, 255, 0.22), transparent 62%),
+    #05080f;
+  transition: opacity 500ms ease, visibility 500ms ease;
+}
+.boot.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.boot__inner { display: grid; justify-items: center; gap: 6px; text-align: center; width: min(420px, 100%); }
+
+.boot__orb { position: relative; width: 148px; height: 148px; display: grid; place-items: center; margin-bottom: 18px; }
+.boot__core {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #b9a3ff, var(--signal));
+  box-shadow: 0 0 44px rgba(139, 107, 255, 0.7);
+  transition: transform 0.4s ease, background 0.4s ease, box-shadow 0.4s ease;
+}
+.boot__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(139, 107, 255, 0.55);
+  opacity: 0;
+  animation: boot-ring 2.6s ease-out infinite;
+}
+.boot__ring:nth-of-type(3) { animation-delay: 0.85s; }
+.boot__ring:nth-of-type(4) { animation-delay: 1.7s; }
+
+@keyframes boot-ring {
+  0% { transform: scale(0.32); opacity: 0.85; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+.boot__orb[data-state="speaking"] .boot__core { transform: scale(1.18); box-shadow: 0 0 60px rgba(139, 107, 255, 0.9); }
+.boot__orb[data-state="speaking"] .boot__ring { animation-duration: 1.3s; }
+.boot__orb[data-state="listening"] .boot__core {
+  background: radial-gradient(circle at 40% 35%, #ff9aa8, var(--down));
+  box-shadow: 0 0 44px rgba(239, 83, 80, 0.7);
+}
+.boot__orb[data-state="listening"] .boot__ring { border-color: rgba(239, 83, 80, 0.55); animation-duration: 1.9s; }
+
+.boot__name { font-size: 2.1rem; font-weight: 700; letter-spacing: 0.22em; }
+.boot__tag { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-dim); }
+
+.boot__bar {
+  width: 190px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(148, 178, 255, 0.14);
+  overflow: hidden;
+  margin: 20px 0 10px;
+}
+.boot__bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--signal), var(--up));
+  transition: width 0.45s ease;
+}
+.boot__status { font-size: 0.8rem; color: var(--ink-dim); min-height: 1.2em; }
+.boot__start { margin-top: 18px; animation: fade-in 0.4s ease-out; }
+
 /* ------------------------------ topbar ------------------------------ */
 
 .topbar {
@@ -923,6 +998,13 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   100% { transform: scale(3); opacity: 0; }
 }
 
+.audio-btn {
+  margin-top: 10px;
+  padding: 10px 18px;
+  font-size: 0.82rem;
+  animation: fade-in 0.3s ease-out;
+}
+
 .wake-toggle {
   display: inline-flex;
   align-items: center;
@@ -1011,6 +1093,29 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   </style>
 </head>
 <body>
+
+  <!-- ------------------------ PANTALLA DE INICIO ------------------------ -->
+  <div class="boot" id="bootScreen" role="dialog" aria-label="IRIS iniciando">
+    <div class="boot__inner">
+      <div class="boot__orb" id="bootOrb" data-state="loading">
+        <span class="boot__core"></span>
+        <span class="boot__ring"></span>
+        <span class="boot__ring"></span>
+        <span class="boot__ring"></span>
+      </div>
+
+      <h1 class="boot__name">IRIS</h1>
+      <p class="boot__tag">Trading AI · Market Analysis</p>
+
+      <div class="boot__bar"><span id="bootProgress"></span></div>
+      <p class="boot__status" id="bootStatus">Iniciando sistemas…</p>
+
+      <button type="button" class="btn btn--primary boot__start" id="bootStart" hidden>
+        Toca para comenzar
+      </button>
+    </div>
+  </div>
+
 
   <header class="topbar">
     <div class="brand">
@@ -1276,6 +1381,10 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     <p class="mic-state" id="micState">Hablar con IRIS</p>
     <p class="mic-hint" id="micHint">Di «Iris» o pulsa el micrófono para hablar.</p>
 
+    <button type="button" class="btn btn--primary audio-btn" id="audioBtn" hidden>
+      🔊 Activar la voz de IRIS
+    </button>
+
     <label class="wake-toggle">
       <input type="checkbox" id="wakeToggle" checked>
       <span class="wake-toggle__track" aria-hidden="true"><span class="wake-toggle__knob"></span></span>
@@ -1298,7 +1407,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.2.0';
+TAI.VERSION = '2.4.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -1373,7 +1482,7 @@ TAI.CONFIG = {
     speechPitch: 1.12,
     preferFemaleVoice: true,
     conversationMode: true,
-    greeting: 'Hola, soy Iris. ¿Qué haremos hoy?'
+    greeting: 'Hola, soy Iris. ¿Qué vamos a hacer hoy?'
   }
 };
 
@@ -3083,6 +3192,8 @@ TAI.getSymbol = function (code) {
   Voice.prototype._pickVoice = function () {
     if (!window.speechSynthesis) return null;
     var voices = window.speechSynthesis.getVoices() || [];
+    // iOS puede devolver la lista vacía en el primer intento: se habla con la voz
+    // por defecto del sistema en lugar de quedarse callada.
     if (!voices.length) return null;
     if (this._voiceCache && voices.indexOf(this._voiceCache) !== -1) return this._voiceCache;
 
@@ -3110,63 +3221,16 @@ TAI.getSymbol = function (code) {
     return matches.map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
-  Voice.prototype._speakChunk = function (text, opts) {
-    var self = this;
-    return new Promise(function (resolve) {
-      var utter = new SpeechSynthesisUtterance(text);
-      var voice = self._pickVoice();
-      if (voice) utter.voice = voice;
-      utter.lang = (voice && voice.lang) || APP.lang;
-      utter.rate = opts.rate || APP.speechRate;
-      utter.pitch = opts.pitch || APP.speechPitch;
-      utter.volume = opts.volume == null ? 1 : opts.volume;
-
-      var done = false;
-      var arrancó = false;
-
-      function finish() {
-        if (done) return;
-        done = true;
-        clearTimeout(guard);
-        clearTimeout(blockGuard);
-        resolve();
-      }
-
-      utter.onstart = function () { arrancó = true; clearTimeout(blockGuard); };
-      utter.onend = finish;
-      utter.onerror = function (ev) {
-        // No romper la app: se informa y se continúa
-        if (ev && ev.error && ev.error !== 'interrupted' && ev.error !== 'canceled') {
-          console.warn('[Voice] reproducción fallida:', ev.error);
-          self.emit('blocked', { reason: ev.error });
-        }
-        finish();
-      };
-
-      // Si el navegador no arranca la locución, casi siempre es bloqueo de autoplay
-      var blockGuard = setTimeout(function () {
-        if (!arrancó) {
-          self._unlocked = false;
-          self.emit('blocked', { reason: 'autoplay' });
-        }
-      }, 1600);
-
-      // Salvaguarda: algunos navegadores móviles no disparan onend
-      var guard = setTimeout(finish, Math.min(30000, 2200 + text.length * 95));
-
-      try {
-        window.speechSynthesis.speak(utter);
-      } catch (err) {
-        console.warn('[Voice] speak() lanzó:', err && err.message);
-        self.emit('blocked', { reason: 'exception' });
-        finish();
-      }
-    });
-  };
+  var ES_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   /**
-   * Habla un texto frase a frase. Devuelve una promesa que resuelve al terminar.
-   * Nunca rechaza: si la síntesis no está disponible, resuelve de inmediato.
+   * Habla un texto. Devuelve una promesa que resuelve al terminar.
+   *
+   * CLAVE PARA iOS/Safari: todas las frases se encolan de forma SÍNCRONA en la
+   * misma llamada. Si se encolara cada frase dentro del .then() de la anterior,
+   * WebKit ya no la considera originada por el gesto del usuario y no suena nada.
+   * La cola nativa de speechSynthesis respeta el orden por sí sola.
    */
   Voice.prototype.speak = function (text, options) {
     var self = this;
@@ -3179,26 +3243,83 @@ TAI.getSymbol = function (code) {
       return Promise.resolve();
     }
 
-    if (!opts.queue) window.speechSynthesis.cancel();
+    // cancel() en iOS deja el motor mudo si se llama justo antes de speak().
+    // Solo se cancela cuando hay algo sonando de verdad.
+    if (!opts.queue && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+      window.speechSynthesis.cancel();
+    }
 
     var chunks = splitSentences(text);
     var token = ++this._speakToken;
+    var voice = this._pickVoice();
+
     this.speaking = true;
     this._startKeepAlive();
     this.emit('speakstart', { text: text });
 
-    return chunks.reduce(function (chain, chunk, i) {
-      return chain.then(function () {
-        if (token !== self._speakToken) return null;       // llegó un speak/cancel posterior
-        return self._speakChunk(chunk, opts).then(function () {
-          if (i < chunks.length - 1) return new Promise(function (r) { setTimeout(r, 140); });
-        });
+    return new Promise(function (resolve) {
+      var terminado = false;
+      var arrancó = false;
+
+      function finish() {
+        if (terminado) return;
+        terminado = true;
+        clearTimeout(guard);
+        clearTimeout(blockGuard);
+        if (token === self._speakToken) {
+          self.speaking = false;
+          self._stopKeepAlive();
+          self.emit('speakend');
+        }
+        resolve();
+      }
+
+      chunks.forEach(function (frase, i) {
+        var utter = new SpeechSynthesisUtterance(frase);
+        if (voice) utter.voice = voice;
+        utter.lang = (voice && voice.lang) || APP.lang;
+        utter.rate = opts.rate || APP.speechRate;
+        utter.pitch = opts.pitch || APP.speechPitch;
+        utter.volume = opts.volume == null ? 1 : opts.volume;
+
+        utter.onstart = function () {
+          arrancó = true;
+          clearTimeout(blockGuard);
+        };
+
+        utter.onerror = function (ev) {
+          var motivo = ev && ev.error;
+          if (motivo && motivo !== 'interrupted' && motivo !== 'canceled') {
+            console.warn('[Voice] reproducción fallida:', motivo);
+            self._unlocked = false;
+            self.emit('blocked', { reason: motivo });
+          }
+          if (i === chunks.length - 1) finish();
+        };
+
+        if (i === chunks.length - 1) utter.onend = finish;
+
+        try {
+          // Encolado inmediato: conserva la activación del gesto en iOS
+          window.speechSynthesis.speak(utter);
+        } catch (err) {
+          console.warn('[Voice] speak() lanzó:', err && err.message);
+          self._unlocked = false;
+          self.emit('blocked', { reason: 'exception' });
+          finish();
+        }
       });
-    }, Promise.resolve()).then(function () {
-      if (token !== self._speakToken) return;
-      self.speaking = false;
-      self._stopKeepAlive();
-      self.emit('speakend');
+
+      // Si no arranca, casi siempre es bloqueo de autoplay de Safari
+      var blockGuard = setTimeout(function () {
+        if (!arrancó) {
+          self._unlocked = false;
+          self.emit('blocked', { reason: 'autoplay' });
+        }
+      }, 1800);
+
+      // Salvaguarda: algunos navegadores móviles no disparan onend
+      var guard = setTimeout(finish, Math.min(45000, 3000 + text.length * 110));
     });
   };
 
@@ -3239,12 +3360,14 @@ TAI.getSymbol = function (code) {
     // 2) Síntesis: una locución muda deja el motor habilitado para el resto de la sesión
     if ('speechSynthesis' in window) {
       try {
-        window.speechSynthesis.cancel();
+        // Nada de cancel() aquí: en iOS deja el motor mudo el resto de la sesión.
+        // Un espacio no produce sonido audible, pero habilita el motor.
         var u = new SpeechSynthesisUtterance(' ');
-        u.volume = 0;
+        u.volume = ES_IOS ? 1 : 0;
         u.rate = 1;
+        u.lang = APP.lang;
         window.speechSynthesis.speak(u);
-        window.speechSynthesis.resume();
+        if (!ES_IOS) window.speechSynthesis.resume();
       } catch (e2) {
         console.warn('[Voice] síntesis no disponible:', e2 && e2.message);
       }
@@ -3261,6 +3384,9 @@ TAI.getSymbol = function (code) {
   Voice.prototype._startKeepAlive = function () {
     var self = this;
     this._stopKeepAlive();
+    // En iOS el pause()/resume() interrumpe la locución en lugar de mantenerla viva
+    if (ES_IOS) return;
+
     this._keepAlive = setInterval(function () {
       if (!self.speaking || !('speechSynthesis' in window)) return;
       try {
@@ -3281,6 +3407,10 @@ TAI.getSymbol = function (code) {
       if (TAI.Voice) TAI.Voice._voiceCache = null;   // reevalúa cuando el sistema carga las voces
     };
   }
+
+  /** ¿El audio quedó habilitado en esta sesión? */
+  Voice.prototype.audioReady = function () { return !!this._unlocked; };
+  Voice.prototype.isIOS = function () { return ES_IOS; };
 
   TAI.Voice = new Voice();
 
@@ -4217,7 +4347,8 @@ TAI.getSymbol = function (code) {
   function cacheElements() {
     [
       'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus', 'irisStatus',
-      'wakeToggle', 'irisHalo',
+      'wakeToggle', 'irisHalo', 'audioBtn',
+      'bootScreen', 'bootOrb', 'bootStatus', 'bootProgress', 'bootStart',
       'irisPanel', 'irisPhase', 'irisMarket', 'irisTicks', 'irisConfValue', 'irisConfBar',
       'irisResult', 'irisTimer', 'irisCount', 'irisAvatar', 'irisStateTag',
       'marketSelect', 'sourceSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
@@ -4470,6 +4601,35 @@ TAI.getSymbol = function (code) {
     if (el.micHint) el.micHint.textContent = copy.hint;
     if (el.waves) el.waves.hidden = state !== 'listening';
     el.micBtn.setAttribute('aria-pressed', state === 'listening' ? 'true' : 'false');
+  }
+
+  /* -------------------------- pantalla de inicio -------------------------- */
+
+  function bootProgress(pct, texto) {
+    if (el.bootProgress) el.bootProgress.style.width = pct + '%';
+    if (texto && el.bootStatus) el.bootStatus.textContent = texto;
+  }
+
+  /** Estado del orbe: loading | speaking | listening */
+  function bootOrbState(state) {
+    if (el.bootOrb) el.bootOrb.dataset.state = state;
+  }
+
+  function bootShowStart() {
+    if (el.bootStart) el.bootStart.hidden = false;
+  }
+
+  function hideBoot() {
+    if (!el.bootScreen) return;
+    el.bootScreen.classList.add('is-done');
+    document.body.classList.remove('is-booting');
+    setTimeout(function () {
+      if (el.bootScreen && el.bootScreen.parentNode) el.bootScreen.remove();
+    }, 600);
+  }
+
+  function bootVisible() {
+    return !!el.bootScreen && !el.bootScreen.classList.contains('is-done');
   }
 
   /* ------------------------ panel flotante de IRIS ------------------------ */
@@ -4744,6 +4904,11 @@ TAI.getSymbol = function (code) {
     mountTradingViewWidget: mountTradingViewWidget,
     setInterim: setInterim,
     flashIris: flashIris,
+    bootProgress: bootProgress,
+    bootOrbState: bootOrbState,
+    bootShowStart: bootShowStart,
+    bootVisible: bootVisible,
+    hideBoot: hideBoot,
     openIrisPanel: openIrisPanel,
     setIrisPhase: setIrisPhase,
     setIrisState: setIrisState,
@@ -4797,6 +4962,7 @@ TAI.getSymbol = function (code) {
     autoBriefDone: false,
     audioWarned: false,
     lastTickAt: 0,
+    bootTimer: null,
     provider: 'deriv',
     ticks: null,             // ticks elegidos por el usuario en esta conversación
     awaitingConfig: false,   // esperando que confirme o cambie la configuración
@@ -4849,30 +5015,86 @@ TAI.getSymbol = function (code) {
   }
 
   /**
-   * Saludo de bienvenida. El texto aparece de inmediato; la voz espera al primer
-   * gesto del usuario porque los navegadores bloquean el audio sin interacción.
+   * Secuencia de arranque: carga → IRIS aparece → habla sola → escucha.
+   * El saludo se intenta automáticamente; si el navegador bloquea el audio,
+   * aparece un botón discreto en lugar de dejar la pantalla colgada.
    */
-  function greet() {
-    var text = CFG.APP.greeting;
-    UI.addMessage('ai', text);
-    state.conversation.push({ role: 'assistant', content: text });
+  function bootSequence() {
+    document.body.classList.add('is-booting');
+    UI.bootProgress(15, 'Iniciando sistemas…');
 
-    function speakGreeting() {
-      document.removeEventListener('pointerdown', speakGreeting);
-      document.removeEventListener('keydown', speakGreeting);
-      if (state.greeted) return;
-      state.greeted = true;
+    // Cualquier toque durante la carga vale como gesto para habilitar el audio
+    var desbloquear = function () { Voice.unlock(); };
+    ['pointerdown', 'touchend', 'click', 'keydown'].forEach(function (evt) {
+      document.addEventListener(evt, desbloquear, { once: true });
+    });
+
+    UI.el.bootStart.addEventListener('click', function () {
+      UI.el.bootStart.hidden = true;
       Voice.unlock();
-      // Tras saludar, IRIS se calla y queda escuchando. No encadena más frases.
-      Voice.speak(text).then(function () {
-        UI.setIrisAvatar('listening');
-        UI.setStatus('iris', state.wakeOn ? 'waiting' : 'off');
-        startWakeListening();
-      });
-    }
+      hablarSaludo();                  // speak dentro del clic: iOS lo acepta
+    });
 
-    document.addEventListener('pointerdown', speakGreeting, { once: false });
-    document.addEventListener('keydown', speakGreeting, { once: false });
+    var pasos = [
+      { pct: 40, texto: 'Cargando el gráfico…', ms: 500 },
+      { pct: 70, texto: 'Conectando con el mercado…', ms: 700 },
+      { pct: 92, texto: 'Preparando a IRIS…', ms: 600 }
+    ];
+
+    var cadena = Promise.resolve();
+    pasos.forEach(function (p) {
+      cadena = cadena.then(function () {
+        return new Promise(function (r) {
+          setTimeout(function () { UI.bootProgress(p.pct, p.texto); r(); }, p.ms);
+        });
+      });
+    });
+
+    return cadena.then(function () {
+      UI.bootProgress(100, 'IRIS lista');
+      return new Promise(function (r) { setTimeout(r, 450); });
+    }).then(hablarSaludo);
+  }
+
+  /** Saludo automático y paso a escucha. */
+  function hablarSaludo() {
+    if (state.greeted) return Promise.resolve();
+    state.greeted = true;
+
+    var texto = CFG.APP.greeting;
+    UI.addMessage('ai', texto);
+    state.conversation.push({ role: 'assistant', content: texto });
+
+    Voice.unlock();
+    UI.bootOrbState('speaking');
+    UI.bootProgress(100, 'IRIS está hablando…');
+    UI.setIrisAvatar('speaking');
+    Voice.mute(true);                    // no escucharse a sí misma
+
+    return Voice.speak(texto).then(function () {
+      Voice.mute(false);
+      escucharRespuesta();
+    });
+  }
+
+  /**
+   * Tras el saludo IRIS escucha directamente: la primera respuesta no necesita
+   * la palabra de activación, se abre una ventana de comando.
+   */
+  function escucharRespuesta() {
+    UI.bootOrbState('listening');
+    UI.bootProgress(100, 'Escuchando… dime qué quieres analizar');
+    UI.setIrisAvatar('listening');
+    UI.setStatus('iris', 'listening');
+
+    Wake.startCommandWindow();
+    startWakeListening();
+
+    // Si no responde, la pantalla de inicio no se queda bloqueada
+    clearTimeout(state.bootTimer);
+    state.bootTimer = setTimeout(function () {
+      if (UI.bootVisible()) UI.hideBoot();
+    }, 14000);
   }
 
   /** Escucha de fondo para detectar «Iris». Requiere permiso: se pide una vez. */
@@ -4925,6 +5147,15 @@ TAI.getSymbol = function (code) {
       useProvider(e.target.value);
     });
 
+    // El speak va DENTRO del manejador del clic: así iOS lo acepta
+    UI.el.audioBtn.addEventListener('click', function () {
+      Voice.unlock();
+      Voice.speak('Voz activada. Ya puedes hablar conmigo.');
+      UI.el.audioBtn.hidden = true;
+      state.audioWarned = false;
+      startWakeListening();
+    });
+
     UI.el.wakeToggle.addEventListener('change', function (e) {
       state.wakeOn = e.target.checked;
       Wake.setEnabled(state.wakeOn);
@@ -4967,6 +5198,7 @@ TAI.getSymbol = function (code) {
   function submitText() {
     var text = (UI.el.textInput.value || '').trim();
     if (!text) return;
+    if (UI.bootVisible()) UI.hideBoot();
     UI.el.textInput.value = '';
     handleUserInput(text);
   }
@@ -4976,6 +5208,7 @@ TAI.getSymbol = function (code) {
   function bindVoice() {
     Voice.on('start', function () {
       UI.setIrisAvatar('listening');
+      if (UI.bootVisible()) UI.bootOrbState('listening');
       UI.setMicState('listening');
       UI.setStatus('voice', 'listening');
       UI.setInterim('');
@@ -5008,6 +5241,8 @@ TAI.getSymbol = function (code) {
       var ruta = Wake.route(p.text, state.micOpen);
 
       if (ruta.action === 'command') {
+        clearTimeout(state.bootTimer);
+        if (UI.bootVisible()) UI.hideBoot();
         UI.setStatus('iris', 'processing');
         UI.setIrisAvatar('thinking');
         handleUserInput(ruta.command);
@@ -5051,6 +5286,7 @@ TAI.getSymbol = function (code) {
     Voice.on('speakstart', function () {
       UI.setStatus('voice', 'speaking');
       UI.setIrisAvatar('speaking');
+      if (UI.bootVisible()) UI.bootOrbState('speaking');
     });
 
     Voice.on('speakend', function () {
@@ -5060,9 +5296,20 @@ TAI.getSymbol = function (code) {
 
     // Safari bloqueó la reproducción: se avisa y se reintenta con el siguiente toque
     Voice.on('blocked', function () {
+      if (UI.bootVisible()) {
+        UI.bootShowStart();
+        UI.bootProgress(100, 'Toca para escuchar a IRIS');
+        UI.bootOrbState('loading');
+        state.greeted = false;          // permite reintentar el saludo con el toque
+      }
+      if (UI.el.audioBtn) UI.el.audioBtn.hidden = false;
       if (state.audioWarned) return;
       state.audioWarned = true;
-      UI.toast('Toca la pantalla una vez para activar la voz de IRIS (Safari lo exige).');
+      UI.toast('Safari bloqueó el audio. Pulsa «Activar la voz de IRIS».');
+    });
+
+    Voice.on('speakstart', function () {
+      if (UI.el.audioBtn) UI.el.audioBtn.hidden = true;   // ya suena: el botón sobra
     });
   }
 
