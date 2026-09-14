@@ -490,23 +490,13 @@ p { margin: 0; }
 
 /* ----------------------- panel flotante de IRIS ----------------------- */
 
-.chart-stage { position: relative; }
-
 .iris-panel {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  z-index: 6;
-  padding: 12px 14px;
-  border-radius: var(--r-md);
   border: 1px solid rgba(139, 107, 255, 0.32);
   background: rgba(10, 14, 26, 0.62);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
   animation: iris-panel-in 260ms ease-out;
-  pointer-events: none;
 }
 @keyframes iris-panel-in {
   from { opacity: 0; transform: translateY(-10px); }
@@ -515,10 +505,63 @@ p { margin: 0; }
 
 .iris-panel__head {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 10px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.iris-panel__id { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.iris-panel__state {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.iris-panel[data-state="analyzing"] .iris-panel__state { color: var(--warn); }
+.iris-panel[data-state="signal"] .iris-panel__state { color: var(--up); }
+.iris-panel[data-state="countdown"] .iris-panel__state { color: var(--warn); }
+
+/* ------------------------- avatar animado de IRIS ------------------------- */
+
+.iris-avatar {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+}
+.iris-avatar__core {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 14px rgba(139, 107, 255, 0.75);
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+.iris-avatar__wave {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--signal);
+  opacity: 0;
+}
+
+/* Las ondas solo se mueven cuando el TTS está realmente reproduciendo */
+.iris-avatar[data-state="speaking"] .iris-avatar__wave {
+  animation: iris-wave 1.4s ease-out infinite;
+}
+.iris-avatar[data-state="speaking"] .iris-avatar__wave:nth-child(3) { animation-delay: 0.7s; }
+.iris-avatar[data-state="speaking"] .iris-avatar__core { transform: scale(1.25); }
+
+.iris-avatar[data-state="listening"] .iris-avatar__core { background: var(--down); box-shadow: 0 0 14px rgba(239, 83, 80, 0.7); }
+.iris-avatar[data-state="listening"] .iris-avatar__wave:first-of-type { animation: iris-wave 2s ease-out infinite; border-color: var(--down); }
+.iris-avatar[data-state="thinking"] .iris-avatar__core { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+.iris-avatar[data-state="idle"] .iris-avatar__core { background: var(--ink-dim); box-shadow: none; }
+
+@keyframes iris-wave {
+  0% { transform: scale(0.45); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 0; }
 }
 .iris-panel__title {
   font-size: 0.64rem;
@@ -611,7 +654,16 @@ p { margin: 0; }
 .iris-panel[data-state="finished"] { border-color: var(--panel-line); }
 
 @media (min-width: 900px) {
-  .iris-panel { right: auto; width: 320px; }
+  .iris-panel__body {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(200px, 1.2fr) minmax(140px, 1fr) auto;
+    gap: 18px;
+    align-items: center;
+  }
+  .iris-panel__grid { margin-bottom: 0; }
+  .iris-panel__track { margin-bottom: 0; }
+  .iris-panel__result { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .iris-panel__timer { margin: 0; padding: 0 0 0 18px; border-top: 0; border-left: 1px solid rgba(148, 178, 255, 0.12); }
 }
 
 /* --------------------- capa de análisis sobre el gráfico --------------------- */
@@ -939,7 +991,8 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
     align-items: start;
   }
-  .panel--market { grid-column: 1; grid-row: 1 / span 2; }
+  .panel--iris { grid-column: 1 / -1; }
+  .panel--market { grid-column: 1; }
   .chart-wrap { height: 380px; }
   .panel--chat { grid-column: 2; }
   .panel--analysis { grid-column: 1; }
@@ -995,6 +1048,48 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
   <main class="layout">
 
+
+    <!-- ------------------------ PANEL DE IRIS ------------------------ -->
+    <section class="panel panel--iris iris-panel" id="irisPanel" hidden data-state="idle" aria-live="polite">
+      <header class="iris-panel__head">
+        <div class="iris-avatar" id="irisAvatar" data-state="idle">
+          <span class="iris-avatar__core"></span>
+          <span class="iris-avatar__wave"></span>
+          <span class="iris-avatar__wave"></span>
+        </div>
+        <div class="iris-panel__id">
+          <span class="iris-panel__title">✦ IRIS · Análisis de mercado</span>
+          <span class="iris-panel__phase" id="irisPhase">Analizando…</span>
+        </div>
+        <span class="iris-panel__state" id="irisStateTag">● ANALYZING</span>
+      </header>
+
+      <div class="iris-panel__body">
+        <div class="iris-panel__grid">
+          <div><dt>Volatility</dt><dd id="irisMarket">—</dd></div>
+          <div><dt>Tick</dt><dd id="irisTicks">—</dd></div>
+        </div>
+
+        <div class="iris-panel__conf">
+          <div class="iris-panel__confhead">
+            <span>Confidence</span>
+            <b id="irisConfValue">—%</b>
+          </div>
+          <div class="iris-panel__track"><span id="irisConfBar"></span></div>
+        </div>
+
+        <div class="iris-panel__result">
+          <span class="iris-panel__label">Result</span>
+          <span class="iris-panel__value" id="irisResult" data-dir="flat">Analizando…</span>
+        </div>
+
+        <div class="iris-panel__timer" id="irisTimer" hidden>
+          <span class="iris-panel__label">Tienes</span>
+          <span class="iris-panel__count" id="irisCount">10</span>
+        </div>
+      </div>
+    </section>
+
     <!-- ---------------------------- MERCADO ---------------------------- -->
     <section class="panel panel--market" aria-label="Mercado">
       <div class="market-head">
@@ -1019,40 +1114,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
         </div>
       </div>
 
-      <div class="chart-stage">
-        <div class="chart-wrap" id="chart" aria-label="Gráfico de precio en vivo"></div>
-
-        <!-- Panel flotante de IRIS, superpuesto al gráfico -->
-        <section class="iris-panel" id="irisPanel" hidden data-state="idle" aria-live="polite">
-          <header class="iris-panel__head">
-            <span class="iris-panel__title">IRIS · Análisis de mercado</span>
-            <span class="iris-panel__phase" id="irisPhase">Analizando…</span>
-          </header>
-
-          <div class="iris-panel__grid">
-            <div><dt>Volatility</dt><dd id="irisMarket">—</dd></div>
-            <div><dt>Tick</dt><dd id="irisTicks">—</dd></div>
-          </div>
-
-          <div class="iris-panel__conf">
-            <div class="iris-panel__confhead">
-              <span>Confianza</span>
-              <b id="irisConfValue">—%</b>
-            </div>
-            <div class="iris-panel__track"><span id="irisConfBar"></span></div>
-          </div>
-
-          <div class="iris-panel__result">
-            <span class="iris-panel__label">Resultado</span>
-            <span class="iris-panel__value" id="irisResult" data-dir="flat">Analizando…</span>
-          </div>
-
-          <div class="iris-panel__timer" id="irisTimer" hidden>
-            <span class="iris-panel__label">Tienes</span>
-            <span class="iris-panel__count" id="irisCount">10</span>
-          </div>
-        </section>
-      </div>
+      <div class="chart-wrap" id="chart" aria-label="Gráfico de precio en vivo"></div>
 
       <dl class="marketdata" id="marketData">
         <div><dt>Último</dt><dd id="mdLast">—</dd></div>
@@ -1236,7 +1298,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.1.0';
+TAI.VERSION = '2.2.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -1311,7 +1373,7 @@ TAI.CONFIG = {
     speechPitch: 1.12,
     preferFemaleVoice: true,
     conversationMode: true,
-    greeting: 'Hola, ¿cómo estás? ¿Quieres iniciar un análisis hoy?'
+    greeting: 'Hola, soy Iris. ¿Qué haremos hoy?'
   }
 };
 
@@ -2792,6 +2854,9 @@ TAI.getSymbol = function (code) {
     this.permissionGranted = false;
     this.muted = false;
     this._ignoreUntil = 0;
+    this._unlocked = false;
+    this.audioCtx = null;
+    this._keepAlive = null;
     this._init();
   }
 
@@ -3057,18 +3122,45 @@ TAI.getSymbol = function (code) {
       utter.volume = opts.volume == null ? 1 : opts.volume;
 
       var done = false;
+      var arrancó = false;
+
       function finish() {
         if (done) return;
         done = true;
         clearTimeout(guard);
+        clearTimeout(blockGuard);
         resolve();
       }
+
+      utter.onstart = function () { arrancó = true; clearTimeout(blockGuard); };
       utter.onend = finish;
-      utter.onerror = finish;
+      utter.onerror = function (ev) {
+        // No romper la app: se informa y se continúa
+        if (ev && ev.error && ev.error !== 'interrupted' && ev.error !== 'canceled') {
+          console.warn('[Voice] reproducción fallida:', ev.error);
+          self.emit('blocked', { reason: ev.error });
+        }
+        finish();
+      };
+
+      // Si el navegador no arranca la locución, casi siempre es bloqueo de autoplay
+      var blockGuard = setTimeout(function () {
+        if (!arrancó) {
+          self._unlocked = false;
+          self.emit('blocked', { reason: 'autoplay' });
+        }
+      }, 1600);
 
       // Salvaguarda: algunos navegadores móviles no disparan onend
       var guard = setTimeout(finish, Math.min(30000, 2200 + text.length * 95));
-      window.speechSynthesis.speak(utter);
+
+      try {
+        window.speechSynthesis.speak(utter);
+      } catch (err) {
+        console.warn('[Voice] speak() lanzó:', err && err.message);
+        self.emit('blocked', { reason: 'exception' });
+        finish();
+      }
     });
   };
 
@@ -3092,6 +3184,7 @@ TAI.getSymbol = function (code) {
     var chunks = splitSentences(text);
     var token = ++this._speakToken;
     this.speaking = true;
+    this._startKeepAlive();
     this.emit('speakstart', { text: text });
 
     return chunks.reduce(function (chain, chunk, i) {
@@ -3104,25 +3197,82 @@ TAI.getSymbol = function (code) {
     }, Promise.resolve()).then(function () {
       if (token !== self._speakToken) return;
       self.speaking = false;
+      self._stopKeepAlive();
       self.emit('speakend');
     });
   };
 
   Voice.prototype.cancelSpeech = function () {
-    this._speakToken++;                    // invalida cualquier cadena de frases en curso
+    this._speakToken++;
+    this._stopKeepAlive();                    // invalida cualquier cadena de frases en curso
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     if (this.speaking) { this.speaking = false; this.emit('speakend'); }
   };
 
-  /** Desbloquea la síntesis en iOS/Safari: debe llamarse dentro de un gesto del usuario. */
+  /**
+   * Desbloquea el audio. DEBE llamarse dentro de un gesto del usuario:
+   * Safari e iOS bloquean cualquier reproducción iniciada sin interacción.
+   * Se hace una sola vez por sesión.
+   */
   Voice.prototype.unlock = function () {
-    if (!('speechSynthesis' in window) || this._unlocked) return;
+    if (this._unlocked) return true;
+
+    // 1) AudioContext: se crea y se reanuda dentro del gesto
     try {
-      var u = new SpeechSynthesisUtterance(' ');
-      u.volume = 0;
-      window.speechSynthesis.speak(u);
-      this._unlocked = true;
-    } catch (e) { /* noop */ }
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) {
+        if (!this.audioCtx) this.audioCtx = new Ctx();
+        if (this.audioCtx.state === 'suspended') {
+          this.audioCtx.resume().catch(function () { /* lo reintenta el siguiente gesto */ });
+        }
+        // Un buffer mudo de un frame marca el contexto como «usado» en iOS
+        var buffer = this.audioCtx.createBuffer(1, 1, 22050);
+        var source = this.audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(this.audioCtx.destination);
+        source.start(0);
+      }
+    } catch (e) {
+      console.warn('[Voice] AudioContext no disponible:', e && e.message);
+    }
+
+    // 2) Síntesis: una locución muda deja el motor habilitado para el resto de la sesión
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0;
+        u.rate = 1;
+        window.speechSynthesis.speak(u);
+        window.speechSynthesis.resume();
+      } catch (e2) {
+        console.warn('[Voice] síntesis no disponible:', e2 && e2.message);
+      }
+    }
+
+    this._unlocked = true;
+    this.emit('audioready', {});
+    return true;
+  };
+
+  /**
+   * iOS corta la síntesis a los ~15 s. Un pause/resume periódico la mantiene viva.
+   */
+  Voice.prototype._startKeepAlive = function () {
+    var self = this;
+    this._stopKeepAlive();
+    this._keepAlive = setInterval(function () {
+      if (!self.speaking || !('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      } catch (e) { /* noop */ }
+    }, 8000);
+  };
+
+  Voice.prototype._stopKeepAlive = function () {
+    if (this._keepAlive) clearInterval(this._keepAlive);
+    this._keepAlive = null;
   };
 
   if ('speechSynthesis' in window) {
@@ -4069,7 +4219,7 @@ TAI.getSymbol = function (code) {
       'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus', 'irisStatus',
       'wakeToggle', 'irisHalo',
       'irisPanel', 'irisPhase', 'irisMarket', 'irisTicks', 'irisConfValue', 'irisConfBar',
-      'irisResult', 'irisTimer', 'irisCount',
+      'irisResult', 'irisTimer', 'irisCount', 'irisAvatar', 'irisStateTag',
       'marketSelect', 'sourceSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
       'mdLast', 'mdHigh', 'mdLow', 'mdRange', 'mdVol', 'mdTrend', 'mdCount', 'mdInterval',
       'feedText', 'reconnectBtn', 'watchBody', 'tvWidget', 'appVersion',
@@ -4353,8 +4503,23 @@ TAI.getSymbol = function (code) {
     if (el.irisPhase) el.irisPhase.textContent = text;
   }
 
+  var STATE_TAG = {
+    idle: '● IDLE', analyzing: '● ANALYZING', signal: '● SIGNAL',
+    countdown: '● COUNTDOWN', finished: '● FINISHED'
+  };
+
   function setIrisState(state) {
     if (el.irisPanel) el.irisPanel.dataset.state = state;
+    if (el.irisStateTag) el.irisStateTag.textContent = STATE_TAG[state] || '● IDLE';
+  }
+
+  /**
+   * Avatar de IRIS. El estado 'speaking' solo debe fijarse cuando el TTS
+   * está reproduciendo de verdad: las ondas nunca se mueven sin audio.
+   * @param {string} state idle | listening | thinking | speaking
+   */
+  function setIrisAvatar(state) {
+    if (el.irisAvatar) el.irisAvatar.dataset.state = state;
   }
 
   function setIrisMarket(label) {
@@ -4582,6 +4747,7 @@ TAI.getSymbol = function (code) {
     openIrisPanel: openIrisPanel,
     setIrisPhase: setIrisPhase,
     setIrisState: setIrisState,
+    setIrisAvatar: setIrisAvatar,
     setIrisMarket: setIrisMarket,
     setIrisTicks: setIrisTicks,
     animateConfidence: animateConfidence,
@@ -4629,6 +4795,7 @@ TAI.getSymbol = function (code) {
     pendingInput: null,
     busySince: 0,
     autoBriefDone: false,
+    audioWarned: false,
     lastTickAt: 0,
     provider: 'deriv',
     ticks: null,             // ticks elegidos por el usuario en esta conversación
@@ -4696,7 +4863,12 @@ TAI.getSymbol = function (code) {
       if (state.greeted) return;
       state.greeted = true;
       Voice.unlock();
-      Voice.speak(text).then(function () { startWakeListening(); });
+      // Tras saludar, IRIS se calla y queda escuchando. No encadena más frases.
+      Voice.speak(text).then(function () {
+        UI.setIrisAvatar('listening');
+        UI.setStatus('iris', state.wakeOn ? 'waiting' : 'off');
+        startWakeListening();
+      });
     }
 
     document.addEventListener('pointerdown', speakGreeting, { once: false });
@@ -4803,6 +4975,7 @@ TAI.getSymbol = function (code) {
 
   function bindVoice() {
     Voice.on('start', function () {
+      UI.setIrisAvatar('listening');
       UI.setMicState('listening');
       UI.setStatus('voice', 'listening');
       UI.setInterim('');
@@ -4836,6 +5009,7 @@ TAI.getSymbol = function (code) {
 
       if (ruta.action === 'command') {
         UI.setStatus('iris', 'processing');
+        UI.setIrisAvatar('thinking');
         handleUserInput(ruta.command);
         return;
       }
@@ -4874,8 +5048,22 @@ TAI.getSymbol = function (code) {
     Wake.setEnabled(state.wakeOn);
     });
 
-    Voice.on('speakstart', function () { UI.setStatus('voice', 'speaking'); });
-    Voice.on('speakend', function () { UI.setStatus('voice', Voice.supported ? 'ready' : 'unsupported'); });
+    Voice.on('speakstart', function () {
+      UI.setStatus('voice', 'speaking');
+      UI.setIrisAvatar('speaking');
+    });
+
+    Voice.on('speakend', function () {
+      UI.setStatus('voice', Voice.supported ? 'ready' : 'unsupported');
+      UI.setIrisAvatar(Voice.listening ? 'listening' : 'idle');
+    });
+
+    // Safari bloqueó la reproducción: se avisa y se reintenta con el siguiente toque
+    Voice.on('blocked', function () {
+      if (state.audioWarned) return;
+      state.audioWarned = true;
+      UI.toast('Toca la pantalla una vez para activar la voz de IRIS (Safari lo exige).');
+    });
   }
 
   /** Reabre el micrófono si la conversación sigue activa. */
@@ -5297,7 +5485,6 @@ TAI.getSymbol = function (code) {
     UI.setMicState('analyzing');
 
     UI.openIrisPanel();
-    if (state.chart.setTopSpace) state.chart.setTopSpace(true);
 
     var ticks = state.ticks || result.ticks;
 
@@ -5434,10 +5621,7 @@ TAI.getSymbol = function (code) {
         state.pendingConfig = null;
         UI.finishIrisPanel();
         if (TAI.AnalysisOverlay) TAI.AnalysisOverlay.clearAnalysisOverlay();
-        setTimeout(function () {
-          UI.closeIrisPanel();
-          if (state.chart.setTopSpace) state.chart.setTopSpace(false);
-        }, 3500);
+        setTimeout(function () { UI.closeIrisPanel(); }, 4000);
 
         say('Análisis ejecutado. ¿Quieres hacer otro análisis?').then(function () {
           finishTurn('finished');
