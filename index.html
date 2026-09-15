@@ -38,6 +38,12 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --dock-height: 196px;
 
+  /* Curva tipo iOS, usada en toda la aplicación */
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-fast: 180ms;
+  --t-base: 280ms;
+  --t-slow: 460ms;
+
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -66,9 +72,41 @@ body {
 h1, h2 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; }
 
+/* ------------------- apertura y cierre de paneles (iOS) ------------------- */
+
+.panel[hidden] { display: none; }
+
+.panel.is-opening {
+  animation: panel-in var(--t-base) var(--ease-ios) both;
+}
+.panel.is-closing {
+  animation: panel-out var(--t-fast) var(--ease-ios) both;
+  pointer-events: none;
+}
+
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes panel-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-8px) scale(0.985); }
+}
+
 /* -------------------------- pantalla de inicio -------------------------- */
 
 body.is-booting { overflow: hidden; }
+
+/* Entrada de la interfaz principal: continúa, no recarga */
+.app-shell {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity var(--t-slow) var(--ease-ios), transform var(--t-slow) var(--ease-ios);
+}
+body.is-booting .app-shell { opacity: 0; transform: scale(0.98); }
+
+.boot { transition: opacity var(--t-slow) var(--ease-ios), transform var(--t-slow) var(--ease-ios); }
+.boot.is-done { opacity: 0; transform: scale(1.03); visibility: hidden; pointer-events: none; }
 
 .boot {
   position: fixed;
@@ -139,6 +177,22 @@ body.is-booting { overflow: hidden; }
   transition: width 0.45s ease;
 }
 .boot__status { font-size: 0.8rem; color: var(--ink-dim); min-height: 1.2em; }
+
+.boot__speech {
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--ink);
+  max-width: 34ch;
+  margin: 6px auto 14px;
+  min-height: 3.2em;
+}
+.boot__speech .w {
+  opacity: 0;
+  transform: translateY(4px);
+  display: inline-block;
+  transition: opacity var(--t-base) var(--ease-ios), transform var(--t-base) var(--ease-ios);
+}
+.boot__speech .w.is-on { opacity: 1; transform: translateY(0); }
 .boot__start { margin-top: 18px; animation: fade-in 0.4s ease-out; }
 
 /* ------------------------------ topbar ------------------------------ */
@@ -408,6 +462,7 @@ body.is-booting { overflow: hidden; }
 
 .btn {
   border-radius: var(--r-sm);
+  transition: background var(--t-fast) var(--ease-ios), border-color var(--t-fast) var(--ease-ios), transform var(--t-fast) var(--ease-ios);
   border: 1px solid var(--panel-line);
   padding: 11px 16px;
   font-family: var(--sans);
@@ -419,6 +474,7 @@ body.is-booting { overflow: hidden; }
   transition: background 0.16s ease, border-color 0.16s ease;
 }
 .btn:hover { background: rgba(148, 178, 255, 0.12); }
+.btn:active { transform: scale(0.97); }
 .btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 .btn--primary {
   background: var(--up);
@@ -1108,6 +1164,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       <p class="boot__tag">Trading AI · Market Analysis</p>
 
       <div class="boot__bar"><span id="bootProgress"></span></div>
+      <p class="boot__speech" id="bootSpeech" aria-live="polite"></p>
       <p class="boot__status" id="bootStatus">Iniciando sistemas…</p>
 
       <button type="button" class="btn btn--primary boot__start" id="bootStart" hidden>
@@ -1117,6 +1174,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   </div>
 
 
+  <div class="app-shell" id="appShell">
   <header class="topbar">
     <div class="brand">
       <h1 class="brand__name">Trading AI</h1>
@@ -1392,6 +1450,8 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
     </label>
   </div>
 
+  </div><!-- /app-shell -->
+
   <div class="toast" id="toast" role="alert" hidden></div>
 
   <!-- Librería oficial de gráficos de TradingView (Lightweight Charts) -->
@@ -1407,7 +1467,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.4.0';
+TAI.VERSION = '2.5.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -1482,7 +1542,7 @@ TAI.CONFIG = {
     speechPitch: 1.12,
     preferFemaleVoice: true,
     conversationMode: true,
-    greeting: 'Hola, soy Iris. ¿Qué vamos a hacer hoy?'
+    greeting: 'Hola, soy Iris. ¿Qué vamos a hacer hoy? ¿Quieres operar o prefieres que espere a que me indiques un análisis?'
   }
 };
 
@@ -3253,6 +3313,15 @@ TAI.getSymbol = function (code) {
     var token = ++this._speakToken;
     var voice = this._pickVoice();
 
+    // Posición de cada frase dentro del texto completo, para los índices de palabra
+    var offsets = [];
+    var cursor = 0;
+    chunks.forEach(function (frase) {
+      var pos = text.indexOf(frase, cursor);
+      offsets.push(pos < 0 ? cursor : pos);
+      cursor = (pos < 0 ? cursor : pos) + frase.length;
+    });
+
     this.speaking = true;
     this._startKeepAlive();
     this.emit('speakstart', { text: text });
@@ -3285,6 +3354,16 @@ TAI.getSymbol = function (code) {
         utter.onstart = function () {
           arrancó = true;
           clearTimeout(blockGuard);
+          self.emit('chunkstart', { text: frase, offset: offsets[i] });
+        };
+
+        // Sincronización real palabra a palabra (no disponible en todos los motores)
+        utter.onboundary = function (ev) {
+          if (!ev || (ev.name && ev.name !== 'word')) return;
+          self.emit('boundary', {
+            charIndex: offsets[i] + (ev.charIndex || 0),
+            total: text.length
+          });
         };
 
         utter.onerror = function (ev) {
@@ -3844,7 +3923,11 @@ TAI.getSymbol = function (code) {
 
     this.container = container;
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    this.ctx = canvas.getContext ? canvas.getContext('2d') : null;
+    if (!this.ctx) {
+      console.warn('[chart] canvas 2D no disponible en este entorno');
+      return;
+    }
     this.ticks = [];
     this.decimals = 3;
     this.visible = 90;
@@ -3861,6 +3944,7 @@ TAI.getSymbol = function (code) {
   };
 
   TickChart.prototype.resize = function () {
+    if (!this.ctx) return;
     var dpr = window.devicePixelRatio || 1;
     var rect = this.canvas.getBoundingClientRect();
     this.width = Math.max(200, rect.width);
@@ -3884,6 +3968,7 @@ TAI.getSymbol = function (code) {
 
   TickChart.prototype.requestDraw = function () {
     var self = this;
+    if (!this.ctx) return;
     if (this._raf) return;
     this._raf = requestAnimationFrame(function () {
       self._raf = null;
@@ -3897,6 +3982,7 @@ TAI.getSymbol = function (code) {
 
   TickChart.prototype.draw = function () {
     var ctx = this.ctx;
+    if (!ctx) return;
     var W = this.width, H = this.height;
     ctx.clearRect(0, 0, W, H);
 
@@ -4348,7 +4434,7 @@ TAI.getSymbol = function (code) {
     [
       'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus', 'irisStatus',
       'wakeToggle', 'irisHalo', 'audioBtn',
-      'bootScreen', 'bootOrb', 'bootStatus', 'bootProgress', 'bootStart',
+      'bootScreen', 'bootOrb', 'bootStatus', 'bootProgress', 'bootStart', 'bootSpeech', 'appShell',
       'irisPanel', 'irisPhase', 'irisMarket', 'irisTicks', 'irisConfValue', 'irisConfBar',
       'irisResult', 'irisTimer', 'irisCount', 'irisAvatar', 'irisStateTag',
       'marketSelect', 'sourceSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
@@ -4615,6 +4701,38 @@ TAI.getSymbol = function (code) {
     if (el.bootOrb) el.bootOrb.dataset.state = state;
   }
 
+  /**
+   * Prepara el texto que IRIS va a decir: cada palabra en su propio span,
+   * invisible hasta que la voz llegue a ella.
+   */
+  function bootSpeechPrepare(texto) {
+    if (!el.bootSpeech) return [];
+    el.bootSpeech.innerHTML = '';
+    var spans = [];
+
+    texto.split(/(\s+)/).forEach(function (trozo) {
+      if (!trozo.trim()) { el.bootSpeech.appendChild(document.createTextNode(trozo)); return; }
+      var s = document.createElement('span');
+      s.className = 'w';
+      s.textContent = trozo;
+      el.bootSpeech.appendChild(s);
+      spans.push(s);
+    });
+
+    return spans;
+  }
+
+  /** Revela las palabras hasta el índice indicado. */
+  function bootSpeechReveal(spans, hasta) {
+    for (var i = 0; i < spans.length && i < hasta; i++) {
+      if (!spans[i].classList.contains('is-on')) spans[i].classList.add('is-on');
+    }
+  }
+
+  function bootSpeechClear() {
+    if (el.bootSpeech) el.bootSpeech.innerHTML = '';
+  }
+
   function bootShowStart() {
     if (el.bootStart) el.bootStart.hidden = false;
   }
@@ -4647,7 +4765,7 @@ TAI.getSymbol = function (code) {
   /** Abre el panel en blanco: los datos se rellenan según IRIS los va diciendo. */
   function openIrisPanel() {
     if (!el.irisPanel) return;
-    el.irisPanel.hidden = false;
+    openPanel(el.irisPanel);
     el.irisPanel.dataset.state = 'analyzing';
     el.irisMarket.textContent = '—';
     el.irisTicks.textContent = '—';
@@ -4734,10 +4852,8 @@ TAI.getSymbol = function (code) {
 
   function closeIrisPanel() {
     clearInterval(confAnim);
-    if (el.irisPanel) {
-      el.irisPanel.hidden = true;
-      el.irisPanel.dataset.state = 'idle';
-    }
+    closePanel(el.irisPanel);
+    if (el.irisPanel) el.irisPanel.dataset.state = 'idle';
   }
 
   /** Halo de activación cuando se detecta «Iris». */
@@ -4782,7 +4898,7 @@ TAI.getSymbol = function (code) {
 
   function showCountdown(info) {
     if (!el.countdownCard) return;
-    el.countdownCard.hidden = false;
+    openPanel(el.countdownCard);
     el.cdMarket.textContent = info.market;
     el.cdDirection.textContent = info.direction;
     el.cdDirection.dataset.dir = info.direction === 'CALL' ? 'up' : info.direction === 'PUT' ? 'down' : 'flat';
@@ -4803,9 +4919,7 @@ TAI.getSymbol = function (code) {
     if (el.cdState) el.cdState.textContent = 'Análisis ejecutado';
   }
 
-  function hideCountdown() {
-    if (el.countdownCard) el.countdownCard.hidden = true;
-  }
+  function hideCountdown() { closePanel(el.countdownCard); }
 
   function addHistory(entry) {
     if (!el.historyList) return;
@@ -4845,9 +4959,29 @@ TAI.getSymbol = function (code) {
   }
 
   /** Panel de configuración sugerida tras el análisis. */
+  /** Muestra un panel con la animación común. */
+  function openPanel(node) {
+    if (!node) return;
+    node.classList.remove('is-closing');
+    node.hidden = false;
+    node.classList.add('is-opening');
+    setTimeout(function () { node.classList.remove('is-opening'); }, 320);
+  }
+
+  /** Oculta un panel dejando terminar la animación inversa. */
+  function closePanel(node) {
+    if (!node || node.hidden) return;
+    node.classList.remove('is-opening');
+    node.classList.add('is-closing');
+    setTimeout(function () {
+      node.classList.remove('is-closing');
+      node.hidden = true;
+    }, 200);
+  }
+
   function showConfig(info) {
     if (!el.configPanel) return;
-    el.configPanel.hidden = false;
+    openPanel(el.configPanel);
     el.cfgMarket.textContent = info.market;
     el.cfgTicks.textContent = info.ticks;
     el.cfgWindow.textContent = info.window + ' s';
@@ -4859,13 +4993,11 @@ TAI.getSymbol = function (code) {
     if (el.resTicks) el.resTicks.textContent = ticks;
   }
 
-  function hideConfig() {
-    if (el.configPanel) el.configPanel.hidden = true;
-  }
+  function hideConfig() { closePanel(el.configPanel); }
 
   function showConfirm(info, onAccept, onCancel) {
     if (!el.confirmPanel) return;
-    el.confirmPanel.hidden = false;
+    openPanel(el.confirmPanel);
     el.confirmDetails.innerHTML = '';
     [
       ['Mercado', info.market],
@@ -4884,9 +5016,7 @@ TAI.getSymbol = function (code) {
     el.confirmCancel.onclick = function () { hideConfirm(); onCancel && onCancel(); };
   }
 
-  function hideConfirm() {
-    if (el.confirmPanel) el.confirmPanel.hidden = true;
-  }
+  function hideConfirm() { closePanel(el.confirmPanel); }
 
   TAI.UI = {
     init: cacheElements,
@@ -4907,6 +5037,11 @@ TAI.getSymbol = function (code) {
     bootProgress: bootProgress,
     bootOrbState: bootOrbState,
     bootShowStart: bootShowStart,
+    bootSpeechPrepare: bootSpeechPrepare,
+    bootSpeechReveal: bootSpeechReveal,
+    bootSpeechClear: bootSpeechClear,
+    openPanel: openPanel,
+    closePanel: closePanel,
     bootVisible: bootVisible,
     hideBoot: hideBoot,
     openIrisPanel: openIrisPanel,
@@ -4963,6 +5098,13 @@ TAI.getSymbol = function (code) {
     audioWarned: false,
     lastTickAt: 0,
     bootTimer: null,
+    bootFailSafe: null,
+    introAnswered: false,
+    speechSpans: [],
+    speechWords: 0,
+    speechRevealed: 0,
+    usedBoundary: false,
+    speechTimer: null,
     provider: 'deriv',
     ticks: null,             // ticks elegidos por el usuario en esta conversación
     awaitingConfig: false,   // esperando que confirme o cambie la configuración
@@ -4977,6 +5119,7 @@ TAI.getSymbol = function (code) {
   function init() {
     UI.init();
     console.info('%cTrading AI v' + TAI.VERSION, 'color:#2ee6a8;font-weight:600');
+    bootSequence();                    // primero, para que nunca se quede colgada
     if (UI.el.appVersion) UI.el.appVersion.textContent = 'v' + TAI.VERSION;
     UI.fillMarketSelect(CFG.MARKET.symbols, state.symbol);
     UI.setMarket(TAI.getSymbol(state.symbol));
@@ -4993,9 +5136,15 @@ TAI.getSymbol = function (code) {
     Wake.setEnabled(state.wakeOn);
 
     if (!state.chart) {
-      UI.el.chart.innerHTML = '';                 // evita gráficos duplicados al recargar
-      state.chart = TAI.createChart(UI.el.chart);
-      UI.setChartOverlay('Conectando con el mercado…');
+      try {
+        UI.el.chart.innerHTML = '';               // evita gráficos duplicados al recargar
+        state.chart = TAI.createChart(UI.el.chart);
+        UI.setChartOverlay('Conectando con el mercado…');
+      } catch (err) {
+        console.error('[app] el gráfico no pudo crearse:', err);
+        UI.setChartOverlay('El gráfico no está disponible en este navegador.');
+        state.chart = { setData: function () {}, push: function () {}, coords: function () { return null; } };
+      }
     }
 
     if (!Voice.supported) {
@@ -5010,8 +5159,6 @@ TAI.getSymbol = function (code) {
 
     Market.connect();
     watchProviderHealth();
-
-    greet();
   }
 
   /**
@@ -5022,6 +5169,22 @@ TAI.getSymbol = function (code) {
   function bootSequence() {
     document.body.classList.add('is-booting');
     UI.bootProgress(15, 'Iniciando sistemas…');
+
+    // Pase lo que pase, la pantalla de inicio se retira: nunca deja la app bloqueada
+    clearTimeout(state.bootFailSafe);
+    state.bootFailSafe = setTimeout(function () {
+      if (UI.bootVisible()) {
+        console.warn('[app] arranque lento: se abre la interfaz igualmente');
+        UI.hideBoot();
+      }
+    }, 9000);
+
+    // Tocar la pantalla de inicio entra directamente a la aplicación
+    UI.el.bootScreen.addEventListener('click', function (e) {
+      if (e.target === UI.el.bootStart) return;    // el botón tiene su propio manejador
+      Voice.unlock();
+      if (state.greeted) UI.hideBoot();
+    });
 
     // Cualquier toque durante la carga vale como gesto para habilitar el audio
     var desbloquear = function () { Voice.unlock(); };
@@ -5053,7 +5216,10 @@ TAI.getSymbol = function (code) {
     return cadena.then(function () {
       UI.bootProgress(100, 'IRIS lista');
       return new Promise(function (r) { setTimeout(r, 450); });
-    }).then(hablarSaludo);
+    }).then(hablarSaludo).catch(function (err) {
+      console.error('[app] fallo en el arranque:', err);
+      UI.hideBoot();
+    });
   }
 
   /** Saludo automático y paso a escucha. */
@@ -5071,10 +5237,45 @@ TAI.getSymbol = function (code) {
     UI.setIrisAvatar('speaking');
     Voice.mute(true);                    // no escucharse a sí misma
 
-    return Voice.speak(texto).then(function () {
-      Voice.mute(false);
-      escucharRespuesta();
-    });
+    prepararTextoHablado(texto);
+
+    return Voice.speak(texto).catch(function () { /* el audio puede estar bloqueado */ })
+      .then(function () {
+        revelarTodo();
+        Voice.mute(false);
+        escucharRespuesta();
+      });
+  }
+
+  /**
+   * Prepara el texto en palabras ocultas y arranca el revelado.
+   * Si el motor de voz emite límites de palabra se usa esa señal real;
+   * si no (pasa en varios navegadores móviles), se avanza por tiempo estimado.
+   */
+  function prepararTextoHablado(texto) {
+    clearInterval(state.speechTimer);
+    state.speechSpans = UI.bootSpeechPrepare(texto);
+    state.speechSpansText = texto;
+    state.speechWords = state.speechSpans.length;
+    state.speechRevealed = 0;
+    state.usedBoundary = false;
+
+    var msPorPalabra = Math.round(330 / (CFG.APP.speechRate || 1));
+
+    state.speechTimer = setInterval(function () {
+      if (state.usedBoundary) { clearInterval(state.speechTimer); return; }
+      if (state.speechRevealed >= state.speechWords) { clearInterval(state.speechTimer); return; }
+      state.speechRevealed++;
+      UI.bootSpeechReveal(state.speechSpans, state.speechRevealed);
+    }, msPorPalabra);
+  }
+
+  function revelarTodo() {
+    clearInterval(state.speechTimer);
+    if (state.speechSpans.length) {
+      UI.bootSpeechReveal(state.speechSpans, state.speechSpans.length);
+      state.speechRevealed = state.speechSpans.length;
+    }
   }
 
   /**
@@ -5094,7 +5295,7 @@ TAI.getSymbol = function (code) {
     clearTimeout(state.bootTimer);
     state.bootTimer = setTimeout(function () {
       if (UI.bootVisible()) UI.hideBoot();
-    }, 14000);
+    }, 6000);
   }
 
   /** Escucha de fondo para detectar «Iris». Requiere permiso: se pide una vez. */
@@ -5102,6 +5303,71 @@ TAI.getSymbol = function (code) {
     if (!state.wakeOn || !Voice.supported) return;
     if (Voice.listening || Voice.speaking) return;
     Voice.startListening();
+  }
+
+  /**
+   * Interpreta la respuesta al saludo: operar, solo analizar, o una orden directa.
+   * En ningún caso se abre una operación: solo se entra a la interfaz.
+   */
+  function responderIntro(texto) {
+    state.introAnswered = true;
+    clearTimeout(state.bootTimer);
+
+    var intent = TAI.AIEngine.detectIntent(texto);
+    var normal = TAI.AIEngine.normalize(texto);
+    UI.addMessage('user', texto);
+    state.conversation.push({ role: 'user', content: texto });
+    UI.bootOrbState('speaking');
+    UI.setIrisAvatar('thinking');
+
+    // La negación manda: «no, solo quiero analizar» no lanza ningún análisis
+    var niega = /^(no|nop|nada|negativo|todavia no|ahora no)\b/.test(normal);
+
+    if (niega) {
+      return decir('Perfecto. Te espero. Cuando quieras dime: Iris, analiza el mercado.')
+        .then(function () { entrarAlPanel(); });
+    }
+
+    // Si ya dio una orden concreta, se entra y se ejecuta
+    var esOrden = ['ANALYZE', 'ANALYZE_AND_EXECUTE', 'PREDICTION', 'RECOMMEND_TICKS',
+                   'RECOMMEND_VOLATILITY', 'MARKET_STATE'].indexOf(intent) !== -1;
+
+    if (esOrden) {
+      return decir('Entendido, entramos.').then(function () {
+        entrarAlPanel();
+        handleUserInput(texto);
+      });
+    }
+
+    if (intent === 'DECLINE') {
+      return decir('Perfecto. Te espero. Cuando quieras dime: Iris, analiza el mercado.')
+        .then(function () { entrarAlPanel(); });
+    }
+
+    // «sí», «quiero operar» y cualquier otra respuesta: se entra sin ejecutar nada
+    return decir('Perfecto, vamos allá.').then(function () { entrarAlPanel(); });
+  }
+
+  /** Habla dentro de la pantalla de bienvenida con el texto sincronizado. */
+  function decir(texto) {
+    UI.addMessage('ai', texto);
+    state.conversation.push({ role: 'assistant', content: texto });
+    prepararTextoHablado(texto);
+    Voice.mute(true);
+    return Voice.speak(texto).catch(function () {}).then(function () {
+      revelarTodo();
+      Voice.mute(false);
+    });
+  }
+
+  /** Transición suave hacia la interfaz principal. IRIS queda en espera. */
+  function entrarAlPanel() {
+    UI.hideBoot();
+    UI.setStatus('iris', state.wakeOn ? 'waiting' : 'off');
+    UI.setIrisAvatar('idle');
+    UI.setMicState('idle');
+    Wake.waiting();
+    resumeListening();
   }
 
   /* ------------------------------- interfaz ------------------------------- */
@@ -5112,6 +5378,13 @@ TAI.getSymbol = function (code) {
       if (!Voice.supported) {
         UI.toast('El reconocimiento de voz no está disponible en este navegador. Escribe tu petición abajo.');
         UI.el.textInput && UI.el.textInput.focus();
+        return;
+      }
+
+      if (UI.bootVisible() && !state.introAnswered) {
+        Voice.cancelSpeech();
+        revelarTodo();
+        escucharRespuesta();
         return;
       }
 
@@ -5198,8 +5471,12 @@ TAI.getSymbol = function (code) {
   function submitText() {
     var text = (UI.el.textInput.value || '').trim();
     if (!text) return;
-    if (UI.bootVisible()) UI.hideBoot();
     UI.el.textInput.value = '';
+
+    if (UI.bootVisible() && !state.introAnswered) {
+      responderIntro(text);
+      return;
+    }
     handleUserInput(text);
   }
 
@@ -5238,6 +5515,13 @@ TAI.getSymbol = function (code) {
 
     Voice.on('final', function (p) {
       state.silenceStreak = 0;
+
+      // Primera respuesta en la pantalla de bienvenida: no requiere «Iris»
+      if (UI.bootVisible() && !state.introAnswered) {
+        responderIntro(p.text);
+        return;
+      }
+
       var ruta = Wake.route(p.text, state.micOpen);
 
       if (ruta.action === 'command') {
@@ -5281,6 +5565,18 @@ TAI.getSymbol = function (code) {
       if (UI.el.wakeToggle) { UI.el.wakeToggle.checked = false; UI.el.wakeToggle.disabled = true; }
     }
     Wake.setEnabled(state.wakeOn);
+    });
+
+    Voice.on('boundary', function (p) {
+      if (!state.speechSpans.length) return;
+      state.usedBoundary = true;
+      // Palabras completas hasta la posición que está pronunciando
+      var recorte = state.speechSpansText ? state.speechSpansText.slice(0, p.charIndex) : null;
+      var indice = recorte == null ? state.speechRevealed + 1 : recorte.split(/\s+/).filter(Boolean).length + 1;
+      if (indice > state.speechRevealed) {
+        state.speechRevealed = indice;
+        UI.bootSpeechReveal(state.speechSpans, indice);
+      }
     });
 
     Voice.on('speakstart', function () {
@@ -5913,8 +6209,37 @@ TAI.getSymbol = function (code) {
 
   /* --------------------------------- init --------------------------------- */
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
+  window.addEventListener('error', function (e) {
+    var pantalla = document.getElementById('bootScreen');
+    var estado = document.getElementById('bootStatus');
+    if (pantalla && !pantalla.classList.contains('is-done')) {
+      if (estado) estado.textContent = 'Error de arranque: ' + (e.message || 'desconocido');
+      setTimeout(function () {
+        pantalla.classList.add('is-done');
+        document.body.classList.remove('is-booting');
+      }, 2500);
+    }
+  });
+
+  function arrancar() {
+    try {
+      init();
+    } catch (err) {
+      console.error('[app] init falló:', err);
+      var pantalla = document.getElementById('bootScreen');
+      var estado = document.getElementById('bootStatus');
+      if (estado) estado.textContent = 'Error de arranque: ' + (err && err.message);
+      if (pantalla) {
+        setTimeout(function () {
+          pantalla.classList.add('is-done');
+          document.body.classList.remove('is-booting');
+        }, 2500);
+      }
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar);
+  else arrancar();
 
   TAI.App = { state: state, confirmConfig: confirmConfig, handleUserInput: handleUserInput, switchMarket: switchMarket, closeMic: closeMic };
 })(window.TAI);
