@@ -195,6 +195,82 @@ body.is-booting .app-shell { opacity: 0; transform: scale(0.98); }
 .boot__speech .w.is-on { opacity: 1; transform: translateY(0); }
 .boot__start { margin-top: 18px; animation: fade-in 0.4s ease-out; }
 
+/* ---------------------- primer ingreso y configuración ---------------------- */
+
+.name-field { width: min(320px, 100%); margin-top: 18px; text-align: left; }
+.name-field .input { width: 100%; }
+
+.settings__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+.settings__head h2 { font-size: 0.95rem; }
+.settings__group {
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin: 16px 0 8px;
+  font-weight: 500;
+}
+
+.vol-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.vol-card {
+  position: relative;
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--panel-line);
+  background: rgba(3, 6, 12, 0.4);
+  color: var(--ink);
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease-ios),
+              background var(--t-fast) var(--ease-ios),
+              transform var(--t-fast) var(--ease-ios);
+}
+.vol-card:hover { background: rgba(148, 178, 255, 0.08); }
+.vol-card:active { transform: scale(0.97); }
+.vol-card:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+.vol-card__name { display: block; font-size: 0.88rem; font-weight: 500; }
+.vol-card__meta { display: block; margin-top: 3px; font-family: var(--mono); font-size: 0.66rem; color: var(--ink-dim); }
+.vol-card__check { position: absolute; top: 9px; right: 10px; color: var(--up); font-size: 0.8rem; opacity: 0; transition: opacity var(--t-fast) var(--ease-ios); }
+
+.vol-card[aria-pressed="true"] {
+  border-color: rgba(139, 107, 255, 0.6);
+  background: rgba(139, 107, 255, 0.14);
+}
+.vol-card[aria-pressed="true"] .vol-card__check { opacity: 1; }
+
+.settings__params {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.settings__params .input { width: 100%; }
+
+/* ------------------------------ historial ------------------------------ */
+
+.journal { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.journal__card {
+  padding: 11px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--r-md);
+  background: rgba(3, 6, 12, 0.4);
+  animation: panel-in var(--t-base) var(--ease-ios) both;
+}
+.journal__top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.journal__code { font-family: var(--mono); font-size: 0.82rem; font-weight: 600; }
+.journal__when { font-size: 0.68rem; color: var(--ink-dim); font-family: var(--mono); }
+.journal__body { margin-top: 6px; font-size: 0.76rem; color: var(--ink-dim); font-family: var(--mono); }
+.journal__result { font-weight: 600; }
+.journal__result[data-r="ACERTADO"] { color: var(--up); }
+.journal__result[data-r="FALLADO"] { color: var(--down); }
+.journal__mode { font-size: 0.62rem; letter-spacing: 0.1em; color: var(--warn); }
+
 /* ------------------------------ topbar ------------------------------ */
 
 .topbar {
@@ -1151,6 +1227,25 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 <body>
 
   <!-- ------------------------ PANTALLA DE INICIO ------------------------ -->
+  <div class="boot boot--name" id="nameScreen" hidden role="dialog" aria-label="Configura tu nombre">
+    <div class="boot__inner">
+      <div class="boot__orb" data-state="loading">
+        <span class="boot__core"></span>
+        <span class="boot__ring"></span>
+        <span class="boot__ring"></span>
+      </div>
+      <h1 class="boot__name">IRIS</h1>
+      <p class="boot__speech">Hola, soy IRIS. Antes de comenzar, ¿cómo quieres que te llame?</p>
+
+      <label class="field name-field">
+        <span class="field__label">¿Cuál es tu nombre?</span>
+        <input type="text" id="nameInput" class="input" placeholder="Tu nombre" autocomplete="given-name"
+               enterkeyhint="done" maxlength="24">
+      </label>
+      <button type="button" class="btn btn--primary boot__start" id="nameAccept">Aceptar</button>
+    </div>
+  </div>
+
   <div class="boot" id="bootScreen" role="dialog" aria-label="IRIS iniciando">
     <div class="boot__inner">
       <div class="boot__orb" id="bootOrb" data-state="loading">
@@ -1268,6 +1363,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
             <span class="field__label">Mercado</span>
             <select id="marketSelect" class="select"></select>
           </label>
+          <button type="button" class="link-btn" id="openSettings">Configuración de trading</button>
           <p class="market-name" id="marketLabel">Volatility 75</p>
         </div>
         <div class="price">
@@ -1414,10 +1510,43 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
       <p class="watch-note">Contexto de mercado. TradingView no publica los índices sintéticos de Deriv, así que esta tabla es de referencia: la IA analiza los índices de volatilidad de arriba.</p>
     </section>
 
+    <!-- --------------------- CONFIGURACIÓN DE TRADING --------------------- -->
+    <section class="panel panel--settings" id="settingsPanel" hidden aria-label="Configuración de trading">
+      <div class="settings__head">
+        <h2>Configuración de trading</h2>
+        <button type="button" class="link-btn" id="closeSettings">Cerrar</button>
+      </div>
+
+      <h3 class="settings__group">⭐ Más utilizadas</h3>
+      <div class="vol-grid" id="volPopular"></div>
+
+      <h3 class="settings__group">Todas las volatilidades</h3>
+      <div class="vol-grid" id="volAll"></div>
+
+      <h3 class="settings__group">Parámetros</h3>
+      <div class="settings__params">
+        <label class="field">
+          <span class="field__label">Ticks</span>
+          <input type="number" id="ticksInput" class="input" min="1" max="10" step="1" value="2">
+        </label>
+        <label class="field">
+          <span class="field__label">Ventana de análisis</span>
+          <input type="number" id="windowInput" class="input" min="5" max="60" step="1" value="10">
+        </label>
+        <label class="field">
+          <span class="field__label">Tu nombre</span>
+          <input type="text" id="nameEdit" class="input" maxlength="24" placeholder="Tu nombre">
+        </label>
+      </div>
+    </section>
+
     <!-- ---------------------------- HISTORIAL ---------------------------- -->
     <section class="panel panel--history" aria-label="Análisis recientes">
-      <h2>Análisis recientes</h2>
-      <ul class="history" id="historyList">
+      <div class="settings__head">
+        <h2>Historial de análisis</h2>
+        <span class="watch-source" id="journalSummary">—</span>
+      </div>
+      <ul class="journal" id="journalList">
         <li class="history__empty">Todavía no has ejecutado ningún análisis.</li>
       </ul>
     </section>
@@ -1467,7 +1596,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.5.0';
+TAI.VERSION = '2.6.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -1513,15 +1642,17 @@ TAI.CONFIG = {
     minTicksForAnalysis: 25,
     symbols: [
       { code: 'R_10',    label: 'Volatility 10',       index: 10,  oneSecond: false, decimals: 3 },
-      { code: '1HZ10V',  label: 'Volatility 10 (1s)',  index: 10,  oneSecond: true,  decimals: 3 },
       { code: 'R_25',    label: 'Volatility 25',       index: 25,  oneSecond: false, decimals: 3 },
-      { code: '1HZ25V',  label: 'Volatility 25 (1s)',  index: 25,  oneSecond: true,  decimals: 2 },
       { code: 'R_50',    label: 'Volatility 50',       index: 50,  oneSecond: false, decimals: 4 },
+      { code: 'R_75',    label: 'Volatility 75',       index: 75,  oneSecond: false, decimals: 4, popular: true },
+      { code: 'R_100',   label: 'Volatility 100',      index: 100, oneSecond: false, decimals: 2, popular: true },
+      { code: 'R_250',   label: 'Volatility 250',      index: 250, oneSecond: false, decimals: 3 },
+      { code: '1HZ10V',  label: 'Volatility 10 (1s)',  index: 10,  oneSecond: true,  decimals: 3 },
+      { code: '1HZ25V',  label: 'Volatility 25 (1s)',  index: 25,  oneSecond: true,  decimals: 2 },
       { code: '1HZ50V',  label: 'Volatility 50 (1s)',  index: 50,  oneSecond: true,  decimals: 2 },
-      { code: 'R_75',    label: 'Volatility 75',       index: 75,  oneSecond: false, decimals: 4 },
-      { code: '1HZ75V',  label: 'Volatility 75 (1s)',  index: 75,  oneSecond: true,  decimals: 2 },
-      { code: 'R_100',   label: 'Volatility 100',      index: 100, oneSecond: false, decimals: 2 },
-      { code: '1HZ100V', label: 'Volatility 100 (1s)', index: 100, oneSecond: true,  decimals: 2 }
+      { code: '1HZ75V',  label: 'Volatility 75 (1s)',  index: 75,  oneSecond: true,  decimals: 2, popular: true },
+      { code: '1HZ100V', label: 'Volatility 100 (1s)', index: 100, oneSecond: true,  decimals: 2, popular: true },
+      { code: '1HZ250V', label: 'Volatility 250 (1s)', index: 250, oneSecond: true,  decimals: 3 }
     ]
   },
 
@@ -1534,7 +1665,8 @@ TAI.CONFIG = {
     countdownSeconds: 10,
     autoBrief: true,            // al conectar, rellena el escenario sin esperar comandos
     liveRefreshMs: 15000,
-    candleSeconds: 5,           // segundos que agrupa cada vela del gráfico
+    candleSeconds: 5,
+    speakCountdown: true,       // IRIS cuenta los segundos en voz alta           // segundos que agrupa cada vela del gráfico
     scanStepMs: 1300,           // duración de cada fase del escaneo visual
     historyLimit: 8,
     lang: 'es-ES',
@@ -2720,6 +2852,28 @@ TAI.getSymbol = function (code) {
     return Math.max(1, Math.min(10, Math.round(v)));
   }
 
+  /** Número de operación mencionado: «la operación 5», «el análisis número 12». */
+  function extractRecordId(text) {
+    var n = normalize(text);
+    var m = n.match(/\b(?:operacion|analisis|registro|numero|num)\s*(?:numero\s*)?(\d{1,3})\b/) ||
+            n.match(/\b(\d{1,3})\b/);
+    return m ? Number(m[1]) : null;
+  }
+
+  /** Nombre propuesto para un registro: «ponle Londres», «llámala scalping». */
+  function extractRecordName(text) {
+    var limpio = String(text || '')
+      .replace(/^.*?(?:ponle|llamala|llamalo|llámala|llámalo|guardala como|guárdala como|titulo|título|nombre)\s+/i, '')
+      .replace(/^(el|la|de)\s+(nombre|titulo|título)\s+/i, '')
+      .replace(/^(el|la)\s+/i, '')
+      .replace(/^["']|["']$/g, '')
+      .trim();
+
+    // Si no cambió nada, no había instrucción de nombre
+    if (!limpio || limpio.toLowerCase() === String(text || '').toLowerCase().trim()) return null;
+    return limpio;
+  }
+
   /* --------------------------- detección de intención --------------------------- */
 
   function detectIntent(text) {
@@ -2730,6 +2884,11 @@ TAI.getSymbol = function (code) {
     if (/^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hey|que tal|que mas|como estas|como te va|quien eres)\b/.test(n)) return 'GREETING';
     if (/^(gracias|muchas gracias|perfecto|genial|excelente|listo|vale)\b/.test(n) && n.length < 24) return 'THANKS';
     if (/^(no|nada|ahora no|todavia no|luego|despues|mas tarde)\b/.test(n) && n.length < 20) return 'DECLINE';
+
+    if (/(elimina|borra|quita)\s+(la\s+)?(operacion|analisis|registro)/.test(n)) return 'JOURNAL_DELETE';
+    if (/(edita|renombra|ponle|cambia el nombre)/.test(n)) return 'JOURNAL_RENAME';
+    if (/(muestrame|muestra|busca|ensename|ver)\s+(la\s+|las\s+|el\s+)?(operacion|operaciones|analisis|registro|historial)/.test(n)) return 'JOURNAL_SHOW';
+    if (/(cuanto gane|cuantas operaciones|cuantos analisis|resumen|cuantas acerte|cuantas falle|como me fue)/.test(n)) return 'JOURNAL_SUMMARY';
 
     if (extractTicks(n) && !/(analiza|analizar|analisis)/.test(n)) return 'SET_TICKS';
 
@@ -2983,6 +3142,8 @@ TAI.getSymbol = function (code) {
   TAI.AIEngine = {
     askTradingAI: askTradingAI,
     extractTicks: extractTicks,
+    extractRecordId: extractRecordId,
+    extractRecordName: extractRecordName,
     detectIntent: detectIntent,
     detectMarket: detectMarket,
     isTradingRelated: isTradingRelated,
@@ -3655,6 +3816,167 @@ TAI.getSymbol = function (code) {
   TAI.detectWakeWord = function (t) { return TAI.WakeWord.containsWakeWord(t); };
   TAI.startWakeWordDetection = function () { TAI.WakeWord.setEnabled(true); };
   TAI.stopWakeWordDetection = function () { TAI.WakeWord.setEnabled(false); };
+})(window.TAI);
+
+/* ==== js/journal.js ==== */
+/**
+ * journal.js
+ * Historial de análisis ejecutados, persistido en localStorage.
+ *
+ * REGLA: aquí no se inventa nada. Cada registro guarda lo que el sistema
+ * midió de verdad: mercado, ticks, dirección estimada, precio al abrir la
+ * ventana y precio al cerrarla. El "resultado" es la comparación real entre
+ * ambos precios, no una ganancia monetaria: la app está en simulación y no
+ * hay cuenta conectada, así que no existe importe que informar.
+ */
+(function (TAI) {
+  'use strict';
+
+  var CLAVE = 'tai.journal.v1';
+  var CLAVE_NOMBRE = 'tai.user.name';
+
+  function leer() {
+    try {
+      var raw = localStorage.getItem(CLAVE);
+      var datos = raw ? JSON.parse(raw) : [];
+      return Array.isArray(datos) ? datos : [];
+    } catch (e) {
+      console.warn('[journal] no se pudo leer el historial:', e && e.message);
+      return [];
+    }
+  }
+
+  function guardar(lista) {
+    try {
+      localStorage.setItem(CLAVE, JSON.stringify(lista));
+      return true;
+    } catch (e) {
+      console.warn('[journal] no se pudo guardar:', e && e.message);
+      return false;
+    }
+  }
+
+  function siguienteId(lista) {
+    return lista.reduce(function (max, r) { return Math.max(max, r.id || 0); }, 0) + 1;
+  }
+
+  function pad(n) { return String(n).padStart(3, '0'); }
+
+  var Journal = {
+    /** Nombre con el que IRIS se dirige al usuario. */
+    getName: function () {
+      try { return localStorage.getItem(CLAVE_NOMBRE) || ''; } catch (e) { return ''; }
+    },
+    setName: function (nombre) {
+      try { localStorage.setItem(CLAVE_NOMBRE, String(nombre || '').trim()); return true; }
+      catch (e) { return false; }
+    },
+
+    list: function () {
+      return leer().sort(function (a, b) { return b.id - a.id; });   // más recientes primero
+    },
+
+    get: function (id) {
+      return leer().find(function (r) { return r.id === Number(id); }) || null;
+    },
+
+    findByName: function (texto) {
+      var q = String(texto || '').toLowerCase().trim();
+      if (!q) return null;
+      return leer().find(function (r) {
+        return r.name && r.name.toLowerCase().indexOf(q) !== -1;
+      }) || null;
+    },
+
+    /**
+     * Registra un análisis ejecutado.
+     * @param {Object} datos { market, ticks, direction, confidence, entryPrice, exitPrice, decimals }
+     */
+    add: function (datos) {
+      var lista = leer();
+      var ahora = new Date();
+
+      var entrada = Number(datos.entryPrice);
+      var salida = Number(datos.exitPrice);
+      var variacion = (isFinite(entrada) && isFinite(salida)) ? salida - entrada : null;
+
+      var resultado = 'SIN DATOS';
+      if (variacion != null && datos.direction !== 'WAIT') {
+        if (variacion === 0) resultado = 'SIN CAMBIO';
+        else if ((datos.direction === 'CALL' && variacion > 0) ||
+                 (datos.direction === 'PUT' && variacion < 0)) resultado = 'ACERTADO';
+        else resultado = 'FALLADO';
+      } else if (datos.direction === 'WAIT') {
+        resultado = 'SIN DIRECCIÓN';
+      }
+
+      var registro = {
+        id: siguienteId(lista),
+        code: '#' + pad(siguienteId(lista)),
+        name: null,
+        date: ahora.toISOString(),
+        dateLabel: ahora.toLocaleDateString('es-CO'),
+        timeLabel: ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+        market: datos.market,
+        ticks: datos.ticks,
+        direction: datos.direction,
+        confidence: datos.confidence,
+        entryPrice: isFinite(entrada) ? entrada : null,
+        exitPrice: isFinite(salida) ? salida : null,
+        change: variacion,
+        decimals: datos.decimals != null ? datos.decimals : 3,
+        result: resultado,
+        mode: 'SIMULACIÓN'
+      };
+
+      lista.push(registro);
+      guardar(lista);
+      return registro;
+    },
+
+    rename: function (id, nombre) {
+      var lista = leer();
+      var r = lista.find(function (x) { return x.id === Number(id); });
+      if (!r) return null;
+      r.name = String(nombre || '').trim() || null;
+      guardar(lista);
+      return r;
+    },
+
+    remove: function (id) {
+      var lista = leer();
+      var i = lista.findIndex(function (x) { return x.id === Number(id); });
+      if (i === -1) return false;
+      lista.splice(i, 1);
+      guardar(lista);
+      return true;
+    },
+
+    /** Resumen de un día (por defecto hoy) calculado solo con lo registrado. */
+    summary: function (fecha) {
+      var dia = (fecha || new Date()).toDateString();
+      var delDia = leer().filter(function (r) { return new Date(r.date).toDateString() === dia; });
+
+      return {
+        total: delDia.length,
+        acertados: delDia.filter(function (r) { return r.result === 'ACERTADO'; }).length,
+        fallados: delDia.filter(function (r) { return r.result === 'FALLADO'; }).length,
+        sinDireccion: delDia.filter(function (r) { return r.result === 'SIN DIRECCIÓN'; }).length,
+        registros: delDia
+      };
+    },
+
+    byMarket: function (etiqueta) {
+      var q = String(etiqueta || '').toLowerCase();
+      return leer().filter(function (r) {
+        return String(r.market || '').toLowerCase().indexOf(q) !== -1;
+      });
+    },
+
+    clear: function () { guardar([]); }
+  };
+
+  TAI.Journal = Journal;
 })(window.TAI);
 
 /* ==== js/countdown.js ==== */
@@ -4435,6 +4757,9 @@ TAI.getSymbol = function (code) {
       'apiStatus', 'aiStatus', 'voiceStatus', 'analysisStatus', 'irisStatus',
       'wakeToggle', 'irisHalo', 'audioBtn',
       'bootScreen', 'bootOrb', 'bootStatus', 'bootProgress', 'bootStart', 'bootSpeech', 'appShell',
+      'nameScreen', 'nameInput', 'nameAccept', 'nameEdit',
+      'settingsPanel', 'openSettings', 'closeSettings', 'volPopular', 'volAll',
+      'ticksInput', 'windowInput', 'journalList', 'journalSummary',
       'irisPanel', 'irisPhase', 'irisMarket', 'irisTicks', 'irisConfValue', 'irisConfBar',
       'irisResult', 'irisTimer', 'irisCount', 'irisAvatar', 'irisStateTag',
       'marketSelect', 'sourceSelect', 'marketLabel', 'lastPrice', 'priceChange', 'tickCount', 'chart',
@@ -4689,6 +5014,108 @@ TAI.getSymbol = function (code) {
     el.micBtn.setAttribute('aria-pressed', state === 'listening' ? 'true' : 'false');
   }
 
+  /* ---------------------- menú de configuración de trading ---------------------- */
+
+  /**
+   * Tarjetas de volatilidad. Las marcadas como populares van en su propia sección.
+   * @param {Array} symbols lista real de mercados disponibles
+   */
+  function renderVolatilities(symbols, actual, onSelect) {
+    if (!el.volPopular || !el.volAll) return;
+
+    function tarjeta(s) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'vol-card';
+      b.setAttribute('aria-pressed', s.code === actual ? 'true' : 'false');
+      b.innerHTML = '<span class="vol-card__name"></span>' +
+                    '<span class="vol-card__meta"></span>' +
+                    '<span class="vol-card__check">✓</span>';
+      b.querySelector('.vol-card__name').textContent = s.label;
+      b.querySelector('.vol-card__meta').textContent = s.oneSecond ? '1 tick/seg' : '1 tick/2 seg';
+      b.addEventListener('click', function () { onSelect(s.code); });
+      return b;
+    }
+
+    el.volPopular.innerHTML = '';
+    el.volAll.innerHTML = '';
+
+    var populares = symbols.filter(function (s) { return s.popular; });
+    (populares.length ? populares : symbols.slice(0, 4)).forEach(function (s) {
+      el.volPopular.appendChild(tarjeta(s));
+    });
+    symbols.forEach(function (s) { el.volAll.appendChild(tarjeta(s)); });
+  }
+
+  function toggleSettings(abrir) {
+    if (!el.settingsPanel) return;
+    if (abrir) openPanel(el.settingsPanel);
+    else closePanel(el.settingsPanel);
+  }
+
+  /* ------------------------------ historial ------------------------------ */
+
+  function renderJournal(registros, resumen) {
+    if (!el.journalList) return;
+    el.journalList.innerHTML = '';
+
+    if (el.journalSummary) {
+      el.journalSummary.textContent = resumen
+        ? resumen.total + ' hoy · ' + resumen.acertados + ' acertados · ' + resumen.fallados + ' fallados'
+        : '—';
+    }
+
+    if (!registros.length) {
+      var vacio = document.createElement('li');
+      vacio.className = 'history__empty';
+      vacio.textContent = 'Todavía no has ejecutado ningún análisis.';
+      el.journalList.appendChild(vacio);
+      return;
+    }
+
+    registros.slice(0, 20).forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = 'journal__card';
+      li.innerHTML =
+        '<div class="journal__top"><span class="journal__code"></span><span class="journal__when"></span></div>' +
+        '<div class="journal__body"></div>' +
+        '<div class="journal__mode"></div>';
+
+      li.querySelector('.journal__code').textContent = r.code + (r.name ? ' — ' + r.name : '');
+      li.querySelector('.journal__when').textContent = r.dateLabel + ' · ' + r.timeLabel;
+
+      var cuerpo = li.querySelector('.journal__body');
+      var variacion = r.change == null ? '—'
+        : (r.change >= 0 ? '+' : '') + r.change.toFixed(r.decimals);
+      cuerpo.innerHTML = '';
+      cuerpo.appendChild(document.createTextNode(
+        r.market + ' · ' + r.ticks + (r.ticks === 1 ? ' tick' : ' ticks') + ' · ' + r.direction +
+        ' · ' + r.confidence + '% · Δ ' + variacion + ' · '));
+      var res = document.createElement('span');
+      res.className = 'journal__result';
+      res.dataset.r = r.result;
+      res.textContent = r.result;
+      cuerpo.appendChild(res);
+
+      li.querySelector('.journal__mode').textContent = 'Simulación · sin importe real';
+      el.journalList.appendChild(li);
+    });
+  }
+
+  /* ---------------------- pantalla de primer ingreso ---------------------- */
+
+  function showNameScreen() {
+    if (!el.nameScreen) return;
+    el.nameScreen.hidden = false;
+    setTimeout(function () { el.nameInput && el.nameInput.focus(); }, 300);
+  }
+
+  function hideNameScreen() {
+    if (!el.nameScreen) return;
+    el.nameScreen.classList.add('is-done');
+    setTimeout(function () { el.nameScreen.hidden = true; }, 600);
+  }
+
   /* -------------------------- pantalla de inicio -------------------------- */
 
   function bootProgress(pct, texto) {
@@ -4922,7 +5349,7 @@ TAI.getSymbol = function (code) {
   function hideCountdown() { closePanel(el.countdownCard); }
 
   function addHistory(entry) {
-    if (!el.historyList) return;
+    if (!el.historyList) return;    // sustituido por renderJournal
     var empty = el.historyList.querySelector('.history__empty');
     if (empty) empty.remove();
 
@@ -5042,6 +5469,11 @@ TAI.getSymbol = function (code) {
     bootSpeechClear: bootSpeechClear,
     openPanel: openPanel,
     closePanel: closePanel,
+    renderVolatilities: renderVolatilities,
+    toggleSettings: toggleSettings,
+    renderJournal: renderJournal,
+    showNameScreen: showNameScreen,
+    hideNameScreen: hideNameScreen,
     bootVisible: bootVisible,
     hideBoot: hideBoot,
     openIrisPanel: openIrisPanel,
@@ -5083,6 +5515,7 @@ TAI.getSymbol = function (code) {
   var UI = TAI.UI;
   var Voice = TAI.Voice;
   var Wake = TAI.WakeWord;
+  var Journal = TAI.Journal;
   var Market = TAI.MarketAPI;      // proveedor activo; se puede cambiar en caliente
 
   var state = {
@@ -5100,6 +5533,12 @@ TAI.getSymbol = function (code) {
     bootTimer: null,
     bootFailSafe: null,
     introAnswered: false,
+    userName: '',
+    entryPrice: null,
+    awaitingName: false,
+    pendingName: null,
+    pendingDelete: null,
+    lastRecord: null,
     speechSpans: [],
     speechWords: 0,
     speechRevealed: 0,
@@ -5153,6 +5592,8 @@ TAI.getSymbol = function (code) {
 
     UI.mountTradingViewWidget();
 
+    refrescarHistorial();
+
     bindUI();
     bindVoice();
     bindMarket();
@@ -5168,6 +5609,7 @@ TAI.getSymbol = function (code) {
    */
   function bootSequence() {
     document.body.classList.add('is-booting');
+    state.userName = Journal.getName();
     UI.bootProgress(15, 'Iniciando sistemas…');
 
     // Pase lo que pase, la pantalla de inicio se retira: nunca deja la app bloqueada
@@ -5216,9 +5658,36 @@ TAI.getSymbol = function (code) {
     return cadena.then(function () {
       UI.bootProgress(100, 'IRIS lista');
       return new Promise(function (r) { setTimeout(r, 450); });
-    }).then(hablarSaludo).catch(function (err) {
+    }).then(function () {
+      // Primera visita: se pregunta el nombre antes de que IRIS salude
+      if (!state.userName) return pedirNombre();
+      return hablarSaludo();
+    }).catch(function (err) {
       console.error('[app] fallo en el arranque:', err);
       UI.hideBoot();
+    });
+  }
+
+  /** Pantalla de primer ingreso. Resuelve cuando el usuario acepta su nombre. */
+  function pedirNombre() {
+    UI.showNameScreen();
+
+    return new Promise(function (resolve) {
+      function aceptar() {
+        var nombre = (UI.el.nameInput.value || '').trim();
+        if (!nombre) { UI.el.nameInput.focus(); return; }
+
+        Journal.setName(nombre);
+        state.userName = nombre;
+        if (UI.el.nameEdit) UI.el.nameEdit.value = nombre;
+        UI.hideNameScreen();
+        setTimeout(function () { resolve(hablarSaludo()); }, 320);
+      }
+
+      UI.el.nameAccept.addEventListener('click', aceptar);
+      UI.el.nameInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); aceptar(); }
+      });
     });
   }
 
@@ -5227,7 +5696,10 @@ TAI.getSymbol = function (code) {
     if (state.greeted) return Promise.resolve();
     state.greeted = true;
 
-    var texto = CFG.APP.greeting;
+    var texto = state.userName
+      ? 'Hola ' + state.userName + ', soy Iris. ¿Qué vamos a hacer hoy? ¿Quieres operar o prefieres que espere a que me indiques un análisis?'
+      : CFG.APP.greeting;
+
     UI.addMessage('ai', texto);
     state.conversation.push({ role: 'assistant', content: texto });
 
@@ -5462,9 +5934,50 @@ TAI.getSymbol = function (code) {
       handleUserInput('analiza el mercado');
     });
 
+    UI.el.openSettings.addEventListener('click', function () {
+      pintarVolatilidades();
+      UI.el.ticksInput.value = state.ticks || (state.lastAnalysis ? state.lastAnalysis.ticks : 2);
+      UI.el.windowInput.value = CFG.APP.countdownSeconds;
+      UI.el.nameEdit.value = state.userName || '';
+      UI.toggleSettings(true);
+    });
+
+    UI.el.closeSettings.addEventListener('click', function () { UI.toggleSettings(false); });
+
+    UI.el.ticksInput.addEventListener('change', function (e) {
+      var n = Math.max(1, Math.min(10, Number(e.target.value) || 2));
+      state.ticks = n;
+      e.target.value = n;
+      UI.updateConfigTicks(n);
+    });
+
+    UI.el.windowInput.addEventListener('change', function (e) {
+      var s = Math.max(5, Math.min(60, Number(e.target.value) || 10));
+      CFG.APP.countdownSeconds = s;
+      e.target.value = s;
+    });
+
+    UI.el.nameEdit.addEventListener('change', function (e) {
+      var nombre = (e.target.value || '').trim();
+      if (!nombre) return;
+      Journal.setName(nombre);
+      state.userName = nombre;
+      UI.toast('Te llamaré ' + nombre + '.');
+    });
+
     UI.el.reconnectBtn.addEventListener('click', function () {
       UI.setFeedText('Reconectando con el mercado…');
       Market.reconnectNow();
+    });
+  }
+
+  /** Repinta las tarjetas de volatilidad manteniendo la selección actual. */
+  function pintarVolatilidades() {
+    UI.renderVolatilities(CFG.MARKET.symbols, state.symbol, function (code) {
+      switchMarket(code, true);
+      pintarVolatilidades();
+      var def = TAI.getSymbol(code);
+      if (def) say('Perfecto, utilizaré ' + TAI.AIEngine.spokenMarket(def.label) + '.');
     });
   }
 
@@ -5887,6 +6400,28 @@ TAI.getSymbol = function (code) {
     var intent = TAI.AIEngine.detectIntent(text);
     var detected = TAI.AIEngine.detectMarket(text);
 
+    // Respuesta a «¿quieres guardar este análisis con un nombre?»
+    if (state.awaitingName) {
+      state.busy = false;
+      return responderGuardado(text, intent);
+    }
+
+    // Comandos sobre el historial
+    if (intent.indexOf('JOURNAL_') === 0) {
+      state.busy = false;
+      return comandoHistorial(text, intent);
+    }
+
+    // Confirmación de un borrado pendiente
+    if (state.pendingDelete && (intent === 'CONFIRM' || intent === 'REPEAT')) {
+      var id = state.pendingDelete;
+      state.pendingDelete = null;
+      state.busy = false;
+      var ok = Journal.remove(id);
+      refrescarHistorial();
+      return say(ok ? 'Operación eliminada.' : 'No encontré esa operación.');
+    }
+
     // «sí», «usa esa» mientras hay una configuración propuesta: se confirma y arranca
     if (state.awaitingConfig && (intent === 'CONFIRM' || intent === 'REPEAT') && state.pendingConfig) {
       state.busy = false;
@@ -6139,6 +6674,11 @@ TAI.getSymbol = function (code) {
     state.busy = true;
     state.busySince = Date.now();
     UI.setStatus('analysis', 'running');
+
+    // Precio real al abrir la ventana: sirve para medir el resultado al cerrarla
+    var apertura = Market.getMarketData();
+    state.entryPrice = apertura.lastPrice;
+    var ultimoDicho = null;
     UI.showCountdown({
       market: result.market,
       direction: result.direction,
@@ -6150,27 +6690,141 @@ TAI.getSymbol = function (code) {
       onTick: function (remaining, progress) {
         UI.updateCountdown(remaining, progress);
         UI.setIrisCountdown(remaining);
+
+        // Un número por segundo, encolado: nunca se adelanta al contador visual
+        if (CFG.APP.speakCountdown && remaining !== ultimoDicho && remaining > 0) {
+          ultimoDicho = remaining;
+          Voice.speak(String(remaining), { queue: true });
+        }
       },
       onDone: function () {
         UI.finishCountdown();
         UI.setStatus('analysis', 'done');
-        UI.addHistory({
+
+        // Resultado MEDIDO: precio real al cerrar contra el de apertura
+        var cierre = Market.getMarketData();
+        var def = TAI.getSymbol(cierre.symbol) || { decimals: 3 };
+
+        var registro = Journal.add({
           market: result.market,
-          direction: result.direction,
           ticks: result.ticks,
+          direction: result.direction,
           confidence: result.confidence,
-          time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+          entryPrice: state.entryPrice,
+          exitPrice: cierre.lastPrice,
+          decimals: def.decimals
         });
+
+        state.lastRecord = registro;
+        refrescarHistorial();
         state.pendingConfig = null;
         UI.finishIrisPanel();
+        state.pendingName = registro;
         if (TAI.AnalysisOverlay) TAI.AnalysisOverlay.clearAnalysisOverlay();
         setTimeout(function () { UI.closeIrisPanel(); }, 4000);
 
-        say('Análisis ejecutado. ¿Quieres hacer otro análisis?').then(function () {
+        var cuenta = CFG.APP.speakCountdown ? 'Terminó. ' : '';
+        var medida = describirResultado(registro);
+
+        say(cuenta + medida + ' ¿Quieres guardar este análisis con un nombre?').then(function () {
+          state.awaitingName = true;
           finishTurn('finished');
         });
       }
     });
+  }
+
+  /** Describe el resultado con los precios reales, sin hablar de dinero. */
+  function describirResultado(r) {
+    if (r.change == null) {
+      return 'Todavía no tengo el precio de cierre para medir el resultado.';
+    }
+
+    var variacion = Math.abs(r.change).toFixed(r.decimals);
+    var sentido = r.change > 0 ? 'subió' : r.change < 0 ? 'bajó' : 'no se movió';
+
+    if (r.result === 'ACERTADO') {
+      return 'El precio ' + sentido + ' ' + variacion + ' puntos: el escenario ' + r.direction +
+        ' se cumplió. Registrado como ' + r.code + ' en simulación, sin importe real.';
+    }
+    if (r.result === 'FALLADO') {
+      return 'El precio ' + sentido + ' ' + variacion + ' puntos: el escenario ' + r.direction +
+        ' no se cumplió. Registrado como ' + r.code + ' en simulación, sin importe real.';
+    }
+    return 'El precio ' + sentido + ' ' + variacion + ' puntos. Registrado como ' + r.code + '.';
+  }
+
+  function refrescarHistorial() {
+    UI.renderJournal(Journal.list(), Journal.summary());
+  }
+
+  /** Guarda o descarta el nombre del último análisis registrado. */
+  function responderGuardado(texto, intent) {
+    state.awaitingName = false;
+    var registro = state.pendingName;
+    state.pendingName = null;
+    if (!registro) return say('No tengo ningún análisis reciente que nombrar.');
+
+    var normal = TAI.AIEngine.normalize(texto);
+    if (/^(no|nada|asi esta bien|dejalo)\b/.test(normal)) {
+      return say('De acuerdo, queda guardado como ' + registro.code + ' sin nombre.');
+    }
+
+    // «sí» a secas: se pregunta el nombre y se espera la siguiente respuesta
+    if (intent === 'CONFIRM' && normal.length < 12) {
+      state.awaitingName = true;
+      state.pendingName = registro;
+      return say('¿Qué nombre quieres ponerle?');
+    }
+
+    var nombre = TAI.AIEngine.extractRecordName(texto) || texto.trim();
+    Journal.rename(registro.id, nombre);
+    refrescarHistorial();
+    return say('Listo: ' + registro.code + ' queda guardado como ' + nombre + '.');
+  }
+
+  /** Consultas y gestión del historial por voz. Nada se calcula fuera de lo registrado. */
+  function comandoHistorial(texto, intent) {
+    var id = TAI.AIEngine.extractRecordId(texto);
+
+    if (intent === 'JOURNAL_DELETE') {
+      if (!id) return say('Dime el número de la operación que quieres eliminar.');
+      var r = Journal.get(id);
+      if (!r) return say('No encontré la operación número ' + id + '.');
+      state.pendingDelete = id;
+      return say('¿Confirmas que quieres eliminar la operación número ' + id + '?');
+    }
+
+    if (intent === 'JOURNAL_RENAME') {
+      var nombre = TAI.AIEngine.extractRecordName(texto);
+      var objetivo = id ? Journal.get(id) : state.lastRecord;
+      if (!objetivo) return say('Dime el número de la operación que quieres editar.');
+      if (!nombre) return say('¿Qué nombre quieres ponerle a ' + objetivo.code + '?');
+      Journal.rename(objetivo.id, nombre);
+      refrescarHistorial();
+      return say('Perfecto, actualicé el nombre de ' + objetivo.code + ' a ' + nombre + '.');
+    }
+
+    if (intent === 'JOURNAL_SHOW') {
+      var buscado = id ? Journal.get(id) : Journal.findByName(texto);
+      if (buscado) {
+        return say(buscado.code + (buscado.name ? ', ' + buscado.name : '') + '. ' +
+          buscado.market + ', ' + buscado.ticks + ' ticks, escenario ' + buscado.direction +
+          ', resultado ' + buscado.result.toLowerCase() + ', del ' + buscado.dateLabel +
+          ' a las ' + buscado.timeLabel + '.');
+      }
+      var resumen = Journal.summary();
+      if (!resumen.total) return say('Todavía no hay análisis registrados hoy.');
+      return say('Hoy tienes ' + resumen.total + ' análisis registrados. Los tienes en el historial.');
+    }
+
+    // JOURNAL_SUMMARY
+    var s = Journal.summary();
+    if (!s.total) return say('Hoy no hay análisis registrados todavía.');
+
+    return say('Hoy registré ' + s.total + (s.total === 1 ? ' análisis' : ' análisis') + ': ' +
+      s.acertados + ' acertaron la dirección, ' + s.fallados + ' no, y ' + s.sinDireccion +
+      ' quedaron sin dirección clara. Estamos en simulación, así que no hay importes reales que sumar.');
   }
 
   function finishTurn(micState) {
