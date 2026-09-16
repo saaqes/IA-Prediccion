@@ -36,7 +36,7 @@
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --dock-height: 196px;
+  --dock-height: 210px;
 
   /* Curva tipo iOS, usada en toda la aplicación */
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
@@ -1046,6 +1046,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
 .mic-dock {
   position: fixed;
+  /* Anclado al viewport: el scroll, los menús y el teclado no lo mueven */
   left: 0;
   right: 0;
   bottom: 0;
@@ -1176,7 +1177,17 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 }
 .wake-toggle input:focus-visible + .wake-toggle__track { outline: 2px solid var(--signal); outline-offset: 2px; }
 
-.mic-dock { position: fixed; }
+.mic-dock { position: fixed; bottom: 0; }
+
+/* El teclado y las barras del navegador cambian el alto: el dock sigue abajo */
+@supports (height: 100dvh) {
+  body { min-height: 100dvh; }
+}
+@media (max-height: 560px) {
+  :root { --dock-height: 168px; }
+  .mic { width: 60px; height: 60px; }
+  .mic svg { width: 25px; height: 25px; }
+}
 
 /* -------------------------------- toast -------------------------------- */
 
@@ -4769,7 +4780,7 @@ TAI.getSymbol = function (code) {
       'analysisPanel', 'resMarket', 'resDirection', 'resConfidence', 'resConfidenceBar',
       'resTicks', 'resDuration', 'resTrend', 'resMomentum', 'resVolatility', 'resReason',
       'countdownCard', 'countdownValue', 'countdownRing', 'cdMarket', 'cdDirection', 'cdTicks', 'cdState',
-      'historyList', 'toast', 'confirmPanel', 'confirmDetails', 'confirmAccept', 'confirmCancel',
+      'toast', 'confirmPanel', 'confirmDetails', 'confirmAccept', 'confirmCancel',
       'textInput', 'sendBtn', 'talkAgainBtn',
       'configPanel', 'configQuestion', 'cfgMarket', 'cfgTicks', 'cfgWindow',
       'useRecBtn', 'changeCfgBtn', 'againBtn'
@@ -5348,30 +5359,6 @@ TAI.getSymbol = function (code) {
 
   function hideCountdown() { closePanel(el.countdownCard); }
 
-  function addHistory(entry) {
-    if (!el.historyList) return;    // sustituido por renderJournal
-    var empty = el.historyList.querySelector('.history__empty');
-    if (empty) empty.remove();
-
-    var li = document.createElement('li');
-    li.className = 'history__item';
-    li.innerHTML =
-      '<span class="history__market"></span>' +
-      '<span class="history__dir" data-dir=""></span>' +
-      '<span class="history__meta"></span>';
-    li.querySelector('.history__market').textContent = entry.market;
-    var dirNode = li.querySelector('.history__dir');
-    dirNode.textContent = entry.direction;
-    dirNode.dataset.dir = entry.direction === 'CALL' ? 'up' : entry.direction === 'PUT' ? 'down' : 'flat';
-    li.querySelector('.history__meta').textContent =
-      entry.ticks + (entry.ticks === 1 ? ' tick' : ' ticks') + ' · ' + entry.confidence + '% · ' + entry.time;
-
-    el.historyList.prepend(li);
-    while (el.historyList.children.length > TAI.CONFIG.APP.historyLimit) {
-      el.historyList.removeChild(el.historyList.lastChild);
-    }
-  }
-
   var toastTimer = null;
   function toast(message) {
     if (!el.toast || !message) return;
@@ -5492,7 +5479,6 @@ TAI.getSymbol = function (code) {
     updateCountdown: updateCountdown,
     finishCountdown: finishCountdown,
     hideCountdown: hideCountdown,
-    addHistory: addHistory,
     toast: toast,
     showConfig: showConfig,
     updateConfigTicks: updateConfigTicks,
