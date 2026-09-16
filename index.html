@@ -1607,7 +1607,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.8.0';
+TAI.VERSION = '2.9.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -2880,7 +2880,9 @@ TAI.getSymbol = function (code) {
     return Math.max(1, Math.min(10, Math.round(v)));
   }
 
-  var AFIRMA = /\b(si|sii|claro|correcto|dale|ok|okay|vale|exacto|obvio|seguro|adelante|hagamoslo|confirmo|de acuerdo|por supuesto|afirmativo|hazlo|quiero|me gustaria|si quiero)\b/;
+  var AFIRMA = /\b(si|sii|claro|correcto|dale|ok|okay|vale|exacto|obvio|seguro|adelante|hagamoslo|confirmo|de acuerdo|por supuesto|afirmativo|hazlo)\b/;
+  // «quiero» aisladamente afirma; «quiero cambiar la volatilidad» es otra petición
+  var AFIRMA_SOLO = /^(quiero|me gustaria|claro que si|eso|esa|hagamoslo|por supuesto)$/;
   var NIEGA = /\b(no|nop|nel|negativo|nunca|jamas|mejor no|ahora no|todavia no|paso|cancela|cancelar)\b/;
 
   /**
@@ -2893,11 +2895,18 @@ TAI.getSymbol = function (code) {
     if (!n) return null;
 
     var niega = NIEGA.test(n);
-    var afirma = AFIRMA.test(n);
+    var afirma = AFIRMA.test(n) || AFIRMA_SOLO.test(n);
+
+    // Una petición con verbo de acción no es una respuesta de sí/no
+    if (/\b(cambiar|cambia|analiza|analizar|muestra|muestrame|elimina|borra|edita|pon|usa|configura)\b/.test(n) &&
+        !/^(si|sii|no|claro|dale|vale|ok)\b/.test(n)) {
+      return null;
+    }
 
     // «no, hagamos otro análisis» empieza negando: la negación inicial manda
     if (niega && /^(no|nop|nel|negativo|mejor no|ahora no|todavia no)\b/.test(n)) return 'NEGATIVE';
     if (afirma && /^(si|sii|claro|correcto|dale|ok|okay|vale|seguro|adelante|por supuesto|confirmo|hazlo|quiero)\b/.test(n)) return 'AFFIRMATIVE';
+    if (AFIRMA_SOLO.test(n)) return 'AFFIRMATIVE';
 
     if (niega && !afirma) return 'NEGATIVE';
     if (afirma && !niega) return 'AFFIRMATIVE';
@@ -5689,6 +5698,20 @@ TAI.getSymbol = function (code) {
    * Estados del arranque. La pantalla de nombre SOLO puede existir en
    * NAME_ONBOARDING, y a ese estado únicamente se entra desde INITIALIZING.
    */
+  /** Estado de la conversación: qué está haciendo IRIS ahora mismo. */
+  var CONV = {
+    IDLE: 'IDLE',
+    LISTENING: 'LISTENING',
+    PROCESSING: 'PROCESSING',
+    ANALYZING: 'ANALYZING',
+    WAITING_OPERATION_CONFIRMATION: 'WAITING_OPERATION_CONFIRMATION',
+    WAITING_ABANDON_CONFIRMATION: 'WAITING_ABANDON_CONFIRMATION',
+    WAITING_NEXT_ANALYSIS: 'WAITING_NEXT_ANALYSIS',
+    WAITING_SAVE_CONFIRMATION: 'WAITING_SAVE_CONFIRMATION',
+    WAITING_DELETE_CONFIRMATION: 'WAITING_DELETE_CONFIRMATION',
+    COUNTDOWN: 'COUNTDOWN'
+  };
+
   var FASES = {
     INITIALIZING: 'INITIALIZING',
     NAME_ONBOARDING: 'NAME_ONBOARDING',
@@ -5731,7 +5754,10 @@ TAI.getSymbol = function (code) {
     provider: 'deriv',
     ticks: null,             // ticks elegidos por el usuario en esta conversación
     awaitingConfig: false,   // esperando que confirme o cambie la configuración
-    question: null,          // contexto de la pregunta abierta: OPERATE | ANOTHER | SAVE | DELETE | VOLATILITY
+    conv: 'IDLE',            // estado de conversación
+    question: null,          // pregunta abierta: OPERATE | ANOTHER_ANALYSIS | ABANDON_ANALYSIS | SAVE_OPERATION | DELETE_OPERATION | VOLATILITY
+    questionPrev: null,      // pregunta que se retoma si el usuario NO abandona
+    interrupted: null,       // acción que el usuario pidió mientras había una pregunta abierta
     wakeOn: true,            // detección de la palabra «Iris»
     lastLiveRefresh: 0,
     silenceStreak: 0,    // turnos seguidos sin escuchar nada
@@ -6652,13 +6678,10 @@ TAI.getSymbol = function (code) {
     var intent = TAI.AIEngine.detectIntent(text);
     var detected = TAI.AIEngine.detectMarket(text);
 
-    // Sí/no interpretado SEGÚN la pregunta que IRIS acaba de hacer
+    // Con una pregunta abierta, NADA se ejecuta sin resolverla primero
     if (state.question && !state.awaitingName) {
-      var respuesta = TAI.AIEngine.detectYesNo(text);
-      if (respuesta) {
-        state.busy = false;
-        return responderPregunta(state.question, respuesta, text);
-      }
+      state.busy = false;
+      return resolverConPreguntaAbierta(text, intent);
     }
 
     // Respuesta a «¿quieres guardar este análisis con un nombre?»
@@ -6823,6 +6846,7 @@ TAI.getSymbol = function (code) {
     UI.setStatus('analysis', 'running');
     UI.setStatus('iris', 'analyzing');
     UI.setMicState('analyzing');
+    state.conv = CONV.ANALYZING;
 
     UI.openIrisPanel();
 
@@ -6891,6 +6915,7 @@ TAI.getSymbol = function (code) {
 
         state.awaitingConfig = true;
         state.question = 'OPERATE';          // el sí/no siguiente decide si se opera
+        state.conv = CONV.WAITING_OPERATION_CONFIRMATION;
 
         return say(fraseConfianza(result.confidence));
       })
@@ -7013,6 +7038,7 @@ TAI.getSymbol = function (code) {
 
         say(cuenta + medida + ' ¿Quieres guardar este análisis con un nombre?').then(function () {
           state.awaitingName = true;
+          state.conv = CONV.WAITING_SAVE_CONFIRMATION;
           finishTurn('finished');
         });
       }
@@ -7044,6 +7070,61 @@ TAI.getSymbol = function (code) {
   }
 
   /**
+   * Orden de prioridad cuando hay una pregunta abierta:
+   * 1) respuesta a la pregunta, 2) petición de cancelar, 3) acción nueva
+   * (que pide confirmación para abandonar), 4) repetir la pregunta.
+   */
+  function resolverConPreguntaAbierta(text, intent) {
+    var respuesta = TAI.AIEngine.detectYesNo(text);
+    if (respuesta) return responderPregunta(state.question, respuesta, text);
+
+    var esAccion = ['ANALYZE', 'ANALYZE_AND_EXECUTE', 'PREDICTION', 'REPEAT',
+                    'RECOMMEND_VOLATILITY', 'RECOMMEND_TICKS', 'SET_TICKS',
+                    'MARKET_STATE'].indexOf(intent) !== -1 ||
+                   !!TAI.AIEngine.detectMarket(text, true);
+
+    // Ya estaba preguntando si abandona: la nueva acción reemplaza a la anterior
+    if (state.question === 'ABANDON_ANALYSIS' && esAccion) {
+      state.interrupted = text;
+      return say('Entiendo que quieres ' + describirAccion(intent, text) +
+        ', pero primero necesito confirmar: ¿quieres abandonar el análisis actual y comenzar eso?')
+        .then(function () { finishTurn('idle'); });
+    }
+
+    if (esAccion) {
+      state.interrupted = text;
+      state.questionPrev = state.question;
+      state.question = 'ABANDON_ANALYSIS';
+      state.conv = CONV.WAITING_ABANDON_CONFIRMATION;
+
+      return say('Entiendo que quieres ' + describirAccion(intent, text) +
+        '. ¿Estás seguro de abandonar este análisis y comenzar uno nuevo?')
+        .then(function () { finishTurn('idle'); });
+    }
+
+    // Cualquier otra cosa: se repite la pregunta pendiente sin ejecutar nada
+    return say(repetirPregunta(state.question)).then(function () { finishTurn('idle'); });
+  }
+
+  /** Describe lo que pidió el usuario, mirando también sus palabras. */
+  function describirAccion(intent, texto) {
+    var n = TAI.AIEngine.normalize(texto || '');
+    if (/volatilidad|volatility|\b(75|100)\b/.test(n)) return 'cambiar la volatilidad';
+    if (/tick/.test(n) || intent === 'SET_TICKS' || intent === 'RECOMMEND_TICKS') return 'cambiar los ticks';
+    if (intent === 'MARKET_STATE') return 'revisar el estado del mercado';
+    return 'hacer otro análisis';
+  }
+
+  function repetirPregunta(q) {
+    if (q === 'OPERATE') return 'Necesito una respuesta: ¿quieres operar con este análisis, sí o no?';
+    if (q === 'ANOTHER_ANALYSIS') return '¿Quieres que haga otro análisis, sí o no?';
+    if (q === 'ABANDON_ANALYSIS') return '¿Abandonamos el análisis actual? Dime sí o no.';
+    if (q === 'DELETE_OPERATION') return '¿Confirmas que quieres eliminar esa operación, sí o no?';
+    if (q === 'VOLATILITY') return 'Dime 75, 100, 75 de un segundo o 100 de un segundo.';
+    return 'Dime sí o no, por favor.';
+  }
+
+  /**
    * Resuelve un sí/no dentro del contexto de la pregunta abierta.
    * Ninguna palabra afirmativa suelta ejecuta nada fuera de contexto.
    */
@@ -7055,24 +7136,49 @@ TAI.getSymbol = function (code) {
       state.awaitingConfig = false;
 
       if (respuesta === 'AFFIRMATIVE') {
+        state.conv = CONV.COUNTDOWN;
         return confirmConfig();                    // usa la configuración actual, sin cambiarla
       }
 
       UI.hideConfig();
-      return say('Perfecto. Hagamos otro análisis.').then(function () {
-        finishTurn('idle');
-        handleUserInput('analiza el mercado');
-      });
+      // No se lanza nada automáticamente: se pregunta y se espera
+      return say('De acuerdo. No realizaremos la operación. ¿Quieres que haga otro análisis?')
+        .then(function () {
+          state.question = 'ANOTHER_ANALYSIS';
+          state.conv = CONV.WAITING_NEXT_ANALYSIS;
+          finishTurn('idle');
+        });
     }
 
-    if (pregunta === 'ANOTHER') {
+    if (pregunta === 'ANOTHER_ANALYSIS') {
       if (respuesta === 'AFFIRMATIVE') {
-        return say('Vamos con otro análisis.').then(function () {
+        return say('De acuerdo. Comenzaremos un nuevo análisis.').then(function () {
           finishTurn('idle');
           handleUserInput('analiza el mercado');
         });
       }
+      state.conv = CONV.IDLE;
       return say('De acuerdo, aquí me quedo. Dime «Iris, analiza» cuando quieras.')
+        .then(function () { finishTurn('idle'); });
+    }
+
+    if (pregunta === 'ABANDON_ANALYSIS') {
+      if (respuesta === 'AFFIRMATIVE') {
+        var accion = state.interrupted || 'analiza el mercado';
+        limpiarAnalisis();
+        return say('De acuerdo. Comenzaremos un nuevo análisis.').then(function () {
+          finishTurn('idle');
+          handleUserInput(accion);
+        });
+      }
+
+      // Se retoma exactamente donde estaba
+      state.question = state.questionPrev || 'OPERATE';
+      state.questionPrev = null;
+      state.interrupted = null;
+      state.conv = CONV.WAITING_OPERATION_CONFIRMATION;
+
+      return say('De acuerdo, continuamos con el análisis actual. ' + repetirPregunta(state.question))
         .then(function () { finishTurn('idle'); });
     }
 
@@ -7087,7 +7193,7 @@ TAI.getSymbol = function (code) {
         .then(function () { state.question = 'VOLATILITY'; finishTurn('idle'); });
     }
 
-    if (pregunta === 'DELETE') {
+    if (pregunta === 'DELETE_OPERATION') {
       var id = state.pendingDelete;
       state.pendingDelete = null;
       if (respuesta === 'NEGATIVE') return say('De acuerdo, no la elimino.');
@@ -7099,6 +7205,21 @@ TAI.getSymbol = function (code) {
     return say('Entendido.').then(function () { finishTurn('idle'); });
   }
 
+  /** Cierra el análisis en curso antes de empezar otro. */
+  function limpiarAnalisis() {
+    state.question = null;
+    state.questionPrev = null;
+    state.interrupted = null;
+    state.awaitingConfig = false;
+    state.awaitingName = false;
+    state.pendingConfig = null;
+    state.conv = CONV.IDLE;
+    UI.hideConfig();
+    UI.hideCountdown();
+    if (TAI.Countdown) TAI.Countdown.stop();
+    if (TAI.AnalysisOverlay) TAI.AnalysisOverlay.clearAnalysisOverlay();
+  }
+
   /** Guarda o descarta el nombre del último análisis registrado. */
   function responderGuardado(texto, intent) {
     state.awaitingName = false;
@@ -7108,7 +7229,7 @@ TAI.getSymbol = function (code) {
 
     if (TAI.AIEngine.detectYesNo(texto) === 'NEGATIVE') {
       return say('De acuerdo, queda guardado como ' + registro.code + ' sin nombre. ¿Quieres hacer otro análisis?')
-        .then(function () { state.question = 'ANOTHER'; finishTurn('idle'); });
+        .then(function () { state.question = 'ANOTHER_ANALYSIS'; finishTurn('idle'); });
     }
 
     // «sí» a secas: se pregunta el nombre y se espera la siguiente respuesta
@@ -7122,7 +7243,7 @@ TAI.getSymbol = function (code) {
     Journal.rename(registro.id, nombre);
     refrescarHistorial();
     return say('Listo: ' + registro.code + ' queda guardado como ' + nombre + '. ¿Quieres hacer otro análisis?')
-      .then(function () { state.question = 'ANOTHER'; finishTurn('idle'); });
+      .then(function () { state.question = 'ANOTHER_ANALYSIS'; finishTurn('idle'); });
   }
 
   /** Consultas y gestión del historial por voz. Nada se calcula fuera de lo registrado. */
@@ -7134,7 +7255,8 @@ TAI.getSymbol = function (code) {
       var r = Journal.get(id);
       if (!r) return say('No encontré la operación número ' + id + '.');
       state.pendingDelete = id;
-      state.question = 'DELETE';
+      state.question = 'DELETE_OPERATION';
+      state.conv = CONV.WAITING_DELETE_CONFIRMATION;
       return say('¿Confirmas que quieres eliminar la operación número ' + id + '?');
     }
 
