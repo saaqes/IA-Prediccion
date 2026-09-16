@@ -1607,7 +1607,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.7.0';
+TAI.VERSION = '2.7.1';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -5236,10 +5236,32 @@ TAI.getSymbol = function (code) {
     setTimeout(function () { el.nameInput && el.nameInput.focus(); }, 300);
   }
 
+  /**
+   * Cierra la pantalla de nombre y la ELIMINA del documento.
+   * Una vez borrada no existe nada que pueda volver a mostrarse.
+   */
   function hideNameScreen() {
     if (!el.nameScreen) return;
-    el.nameScreen.classList.add('is-done');
-    setTimeout(function () { el.nameScreen.hidden = true; }, 600);
+    var nodo = el.nameScreen;
+    nodo.classList.add('is-done');
+
+    setTimeout(function () {
+      if (nodo.parentNode) nodo.parentNode.removeChild(nodo);
+      el.nameScreen = null;
+      el.nameInput = null;
+      el.nameAccept = null;
+    }, 600);
+  }
+
+  /** Elimina la pantalla de nombre sin animación (ya hay nombre guardado). */
+  function destroyNameScreen() {
+    if (el.nameScreen && el.nameScreen.parentNode) {
+      el.nameScreen.parentNode.removeChild(el.nameScreen);
+    }
+    el.nameScreen = null;
+    el.nameInput = null;
+    el.nameAccept = null;
+    nameScreenUsada = true;
   }
 
   /* -------------------------- pantalla de inicio -------------------------- */
@@ -5576,6 +5598,7 @@ TAI.getSymbol = function (code) {
     renderJournal: renderJournal,
     showNameScreen: showNameScreen,
     hideNameScreen: hideNameScreen,
+    destroyNameScreen: destroyNameScreen,
     bootVisible: bootVisible,
     hideBoot: hideBoot,
     openIrisPanel: openIrisPanel,
@@ -5649,6 +5672,7 @@ TAI.getSymbol = function (code) {
     introAnswered: false,
     onboardingShown: false,
     onboardingDone: false,
+    firstRun: true,
     nameVolatile: false,
     userName: '',
     entryPrice: null,
@@ -5731,6 +5755,13 @@ TAI.getSymbol = function (code) {
     state.userName = Journal.getName();
     state.onboardingDone = Journal.hasOnboarded();
     state.phase = FASES.INITIALIZING;
+
+    state.firstRun = !state.userName && !state.onboardingDone;
+
+    if (!state.firstRun) {
+      UI.destroyNameScreen();          // no existe: imposible que reaparezca
+      state.onboardingShown = true;
+    }
 
     console.info('[iris] arranque:', {
       nombreGuardado: state.userName || '(ninguno)',
@@ -5823,7 +5854,12 @@ TAI.getSymbol = function (code) {
         if (!nombre) { UI.el.nameInput.focus(); return; }
 
         Journal.setName(nombre);                      // guarda nombre + onboarding hecho
-        state.userName = nombre;
+
+        var comprobado = Journal.getName();
+        console.info('[iris] nombre guardado:', comprobado || '(no se pudo guardar)',
+                     '| persiste:', Journal.namePersists());
+
+        state.userName = comprobado || nombre;
         state.onboardingDone = true;
         state.onboardingShown = true;
         state.phase = FASES.GREETING;                 // salida definitiva del onboarding
@@ -5852,7 +5888,7 @@ TAI.getSymbol = function (code) {
     state.greeted = true;
     state.phase = FASES.GREETING;
 
-    var conocido = state.userName && state.onboardingDone && !state.onboardingShown;
+    var conocido = state.userName && !state.firstRun;   // ya lo conocía de antes
     var texto;
 
     if (state.userName && conocido) {
