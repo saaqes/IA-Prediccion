@@ -1607,7 +1607,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.7.1';
+TAI.VERSION = '2.8.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -1650,20 +1650,15 @@ TAI.CONFIG = {
     // con active_symbols. Si no llega, la app NO inventa códigos.
     defaultSymbol: '1HZ75V',
     requireServerSymbols: true,
+    // Códigos admitidos: ninguna otra volatilidad entra en la aplicación
+    allowed: ['R_75', 'R_100', '1HZ75V', '1HZ100V'],
+    confidence: { bajo: 60, medio: 70, alto: 80 },
     minTicksForAnalysis: 25,
     symbols: [
-      { code: 'R_10',    label: 'Volatility 10',       index: 10,  oneSecond: false, decimals: 3 },
-      { code: 'R_25',    label: 'Volatility 25',       index: 25,  oneSecond: false, decimals: 3 },
-      { code: 'R_50',    label: 'Volatility 50',       index: 50,  oneSecond: false, decimals: 4 },
-      { code: 'R_75',    label: 'Volatility 75',       index: 75,  oneSecond: false, decimals: 4, popular: true },
-      { code: 'R_100',   label: 'Volatility 100',      index: 100, oneSecond: false, decimals: 2, popular: true },
-      { code: 'R_250',   label: 'Volatility 250',      index: 250, oneSecond: false, decimals: 3 },
-      { code: '1HZ10V',  label: 'Volatility 10 (1s)',  index: 10,  oneSecond: true,  decimals: 3 },
-      { code: '1HZ25V',  label: 'Volatility 25 (1s)',  index: 25,  oneSecond: true,  decimals: 2 },
-      { code: '1HZ50V',  label: 'Volatility 50 (1s)',  index: 50,  oneSecond: true,  decimals: 2 },
-      { code: '1HZ75V',  label: 'Volatility 75 (1s)',  index: 75,  oneSecond: true,  decimals: 2, popular: true },
-      { code: '1HZ100V', label: 'Volatility 100 (1s)', index: 100, oneSecond: true,  decimals: 2, popular: true },
-      { code: '1HZ250V', label: 'Volatility 250 (1s)', index: 250, oneSecond: true,  decimals: 3 }
+      { code: 'R_75',    label: 'Volatility 75',       index: 75,  oneSecond: false, decimals: 4, short: '75',    popular: true },
+      { code: 'R_100',   label: 'Volatility 100',      index: 100, oneSecond: false, decimals: 2, short: '100',   popular: true },
+      { code: '1HZ75V',  label: 'Volatility 75 (1s)',  index: 75,  oneSecond: true,  decimals: 2, short: '75 1s', popular: true },
+      { code: '1HZ100V', label: 'Volatility 100 (1s)', index: 100, oneSecond: true,  decimals: 2, short: '100 1s',popular: true }
     ]
   },
 
@@ -1938,20 +1933,31 @@ TAI.getSymbol = function (code) {
     });
 
     var elegidos = volatilidad.length ? volatilidad : (sinteticos.length ? sinteticos : abiertos);
+
+    // Filtro final: solo los códigos admitidos por la aplicación
+    var permitidos = TAI.CONFIG.MARKET.allowed || [];
+    if (permitidos.length) {
+      var soloPermitidos = elegidos.filter(function (r) { return permitidos.indexOf(r.symbol) !== -1; });
+      if (soloPermitidos.length) elegidos = soloPermitidos;
+    }
     elegidos = elegidos.slice(0, 12);
 
     if (!elegidos.length) return false;
 
+    var previos = TAI.CONFIG.MARKET.symbols || [];
     TAI.CONFIG.MARKET.symbols = elegidos.map(function (r) {
+      var local = previos.find(function (p) { return p.code === r.symbol; }) || {};
       var nombre = (r.display_name || r.symbol).replace(/\s*Index$/i, '').trim();
       var num = nombre.match(/(\d+)/);
       var pip = Number(r.pip) || 0.001;
       return {
         code: r.symbol,
-        label: nombre,
-        index: num ? Number(num[1]) : 0,
+        label: local.label || nombre,
+        index: num ? Number(num[1]) : (local.index || 0),
         oneSecond: /\(1s\)|1hz/i.test(nombre + ' ' + r.symbol),
-        decimals: Math.max(0, Math.min(8, Math.round(-Math.log(pip) / Math.LN10)))
+        decimals: Math.max(0, Math.min(8, Math.round(-Math.log(pip) / Math.LN10))),
+        short: local.short,
+        popular: true
       };
     });
 
@@ -2821,14 +2827,25 @@ TAI.getSymbol = function (code) {
 
   /* ------------------------ detección de mercado ------------------------ */
 
-  function detectMarket(text) {
+  /**
+   * Detecta la volatilidad mencionada. Solo existen 75 y 100 (normal y 1s),
+   * así que cualquier otro número no selecciona nada.
+   * @param {string} text
+   * @param {boolean} contextoVolatilidad true cuando IRIS acaba de preguntar por ella
+   */
+  function detectMarket(text, contextoVolatilidad) {
     var n = normalize(text);
-    var indexMatch = n.match(/\b(?:volatility|volatilidad|indice|v)\s*-?\s*(10|25|50|75|100)\b/) ||
-                     n.match(/\b(10|25|50|75|100)\b(?=[^0-9]*(?:s|seg|segundo|tick|volatil|$))/);
+
+    var indexMatch = n.match(/\b(?:volatility|volatilidad|indice|v)\s*-?\s*(75|100)\b/) ||
+                     n.match(/\b(75|100)\b/);
     if (!indexMatch) return null;
 
+    // Fuera del contexto de volatilidad, un número suelto no cambia el mercado
+    var sueltoSinContexto = !/(volatility|volatilidad|indice|\bv\b|mercado|usa|cambia|pon|analiza)/.test(n);
+    if (sueltoSinContexto && !contextoVolatilidad) return null;
+
     var index = Number(indexMatch[1]);
-    var oneSecond = /\b(1\s*s|1\s*seg|1\s*segundo|un\s*segundo|1hz|hz)\b/.test(n);
+    var oneSecond = /\b(1\s*s|1\s*seg|1\s*segundo|un\s*segundo|de un segundo|1hz|hz)\b/.test(n);
 
     var match = TAI.CONFIG.MARKET.symbols.find(function (s) {
       return s.index === index && s.oneSecond === oneSecond;
@@ -2861,6 +2878,31 @@ TAI.getSymbol = function (code) {
   function clampTicks(v) {
     if (!v || isNaN(v)) return null;
     return Math.max(1, Math.min(10, Math.round(v)));
+  }
+
+  var AFIRMA = /\b(si|sii|claro|correcto|dale|ok|okay|vale|exacto|obvio|seguro|adelante|hagamoslo|confirmo|de acuerdo|por supuesto|afirmativo|hazlo|quiero|me gustaria|si quiero)\b/;
+  var NIEGA = /\b(no|nop|nel|negativo|nunca|jamas|mejor no|ahora no|todavia no|paso|cancela|cancelar)\b/;
+
+  /**
+   * Interpreta una respuesta cuando el contexto espera sí/no.
+   * Compara palabras completas: «notable» o «sitio» no cuentan como no/sí.
+   * @returns {'AFFIRMATIVE'|'NEGATIVE'|null}
+   */
+  function detectYesNo(text) {
+    var n = normalize(text);
+    if (!n) return null;
+
+    var niega = NIEGA.test(n);
+    var afirma = AFIRMA.test(n);
+
+    // «no, hagamos otro análisis» empieza negando: la negación inicial manda
+    if (niega && /^(no|nop|nel|negativo|mejor no|ahora no|todavia no)\b/.test(n)) return 'NEGATIVE';
+    if (afirma && /^(si|sii|claro|correcto|dale|ok|okay|vale|seguro|adelante|por supuesto|confirmo|hazlo|quiero)\b/.test(n)) return 'AFFIRMATIVE';
+
+    if (niega && !afirma) return 'NEGATIVE';
+    if (afirma && !niega) return 'AFFIRMATIVE';
+
+    return null;
   }
 
   /** Número de operación mencionado: «la operación 5», «el análisis número 12». */
@@ -3153,6 +3195,7 @@ TAI.getSymbol = function (code) {
   TAI.AIEngine = {
     askTradingAI: askTradingAI,
     extractTicks: extractTicks,
+    detectYesNo: detectYesNo,
     extractRecordId: extractRecordId,
     extractRecordName: extractRecordName,
     detectIntent: detectIntent,
@@ -5688,6 +5731,7 @@ TAI.getSymbol = function (code) {
     provider: 'deriv',
     ticks: null,             // ticks elegidos por el usuario en esta conversación
     awaitingConfig: false,   // esperando que confirme o cambie la configuración
+    question: null,          // contexto de la pregunta abierta: OPERATE | ANOTHER | SAVE | DELETE | VOLATILITY
     wakeOn: true,            // detección de la palabra «Iris»
     lastLiveRefresh: 0,
     silenceStreak: 0,    // turnos seguidos sin escuchar nada
@@ -6608,6 +6652,15 @@ TAI.getSymbol = function (code) {
     var intent = TAI.AIEngine.detectIntent(text);
     var detected = TAI.AIEngine.detectMarket(text);
 
+    // Sí/no interpretado SEGÚN la pregunta que IRIS acaba de hacer
+    if (state.question && !state.awaitingName) {
+      var respuesta = TAI.AIEngine.detectYesNo(text);
+      if (respuesta) {
+        state.busy = false;
+        return responderPregunta(state.question, respuesta, text);
+      }
+    }
+
     // Respuesta a «¿quieres guardar este análisis con un nombre?»
     if (state.awaitingName) {
       state.busy = false;
@@ -6708,6 +6761,7 @@ TAI.getSymbol = function (code) {
       }
 
       if (result.intent === 'recommend_volatility' && result.suggestedMarket) {
+      state.question = 'VOLATILITY';
         return say(result.speech).then(function () {
           switchMarket(result.suggestedMarket.code, true);
           finishTurn('idle');
@@ -6836,12 +6890,35 @@ TAI.getSymbol = function (code) {
         });
 
         state.awaitingConfig = true;
+        state.question = 'OPERATE';          // el sí/no siguiente decide si se opera
 
-        return say('¿Con cuántos ticks quieres operar en tu Deriv y en qué volatilidad? ' +
-          'Puedes decir «usa esa» para aceptar mi recomendación de ' + ticks +
-          (ticks === 1 ? ' tick' : ' ticks') + '.');
+        return say(fraseConfianza(result.confidence));
       })
       .then(function () { finishTurn('idle'); });
+  }
+
+  /**
+   * Frase según la confianza real del análisis. Nunca promete resultados.
+   * @param {number} c porcentaje calculado por el motor
+   */
+  function fraseConfianza(c) {
+    var U = CFG.MARKET.confidence || { bajo: 60, medio: 70, alto: 80 };
+
+    if (c < U.bajo) {
+      return 'El análisis terminó con una confianza del ' + c + ' por ciento, que es baja. ' +
+             '¿Estás seguro de operar con este porcentaje o hacemos otro análisis?';
+    }
+    if (c < U.medio) {
+      return 'El análisis terminó con una confianza del ' + c + ' por ciento. ' +
+             '¿Quieres operar con este análisis o hacemos otro?';
+    }
+    if (c < U.alto) {
+      return 'El análisis terminó con una confianza del ' + c + ' por ciento. ' +
+             'Es un porcentaje alto según el criterio configurado. ¿Te gustaría hacerlo?';
+    }
+    return 'El análisis terminó con una confianza del ' + c + ' por ciento. ' +
+           'El porcentaje es alto según el criterio configurado, aunque no garantiza el resultado. ' +
+           '¿Te gustaría hacerlo?';
   }
 
   /** Pronuncia el guion paso a paso, aplicando cada efecto antes de hablar. */
@@ -6966,6 +7043,62 @@ TAI.getSymbol = function (code) {
     UI.renderJournal(Journal.list(), Journal.summary());
   }
 
+  /**
+   * Resuelve un sí/no dentro del contexto de la pregunta abierta.
+   * Ninguna palabra afirmativa suelta ejecuta nada fuera de contexto.
+   */
+  function responderPregunta(contexto, respuesta, textoOriginal) {
+    var pregunta = contexto;
+    state.question = null;
+
+    if (pregunta === 'OPERATE') {
+      state.awaitingConfig = false;
+
+      if (respuesta === 'AFFIRMATIVE') {
+        return confirmConfig();                    // usa la configuración actual, sin cambiarla
+      }
+
+      UI.hideConfig();
+      return say('Perfecto. Hagamos otro análisis.').then(function () {
+        finishTurn('idle');
+        handleUserInput('analiza el mercado');
+      });
+    }
+
+    if (pregunta === 'ANOTHER') {
+      if (respuesta === 'AFFIRMATIVE') {
+        return say('Vamos con otro análisis.').then(function () {
+          finishTurn('idle');
+          handleUserInput('analiza el mercado');
+        });
+      }
+      return say('De acuerdo, aquí me quedo. Dime «Iris, analiza» cuando quieras.')
+        .then(function () { finishTurn('idle'); });
+    }
+
+    if (pregunta === 'VOLATILITY') {
+      var mercado = TAI.AIEngine.detectMarket(textoOriginal, true);
+      if (mercado) {
+        switchMarket(mercado.code, true);
+        return say('Perfecto, utilizaré ' + TAI.AIEngine.spokenMarket(mercado.label) + '.')
+          .then(function () { finishTurn('idle'); });
+      }
+      return say('Dime 75, 100, 75 de un segundo o 100 de un segundo.')
+        .then(function () { state.question = 'VOLATILITY'; finishTurn('idle'); });
+    }
+
+    if (pregunta === 'DELETE') {
+      var id = state.pendingDelete;
+      state.pendingDelete = null;
+      if (respuesta === 'NEGATIVE') return say('De acuerdo, no la elimino.');
+      var ok = Journal.remove(id);
+      refrescarHistorial();
+      return say(ok ? 'Operación eliminada.' : 'No encontré esa operación.');
+    }
+
+    return say('Entendido.').then(function () { finishTurn('idle'); });
+  }
+
   /** Guarda o descarta el nombre del último análisis registrado. */
   function responderGuardado(texto, intent) {
     state.awaitingName = false;
@@ -6973,13 +7106,13 @@ TAI.getSymbol = function (code) {
     state.pendingName = null;
     if (!registro) return say('No tengo ningún análisis reciente que nombrar.');
 
-    var normal = TAI.AIEngine.normalize(texto);
-    if (/^(no|nada|asi esta bien|dejalo)\b/.test(normal)) {
-      return say('De acuerdo, queda guardado como ' + registro.code + ' sin nombre.');
+    if (TAI.AIEngine.detectYesNo(texto) === 'NEGATIVE') {
+      return say('De acuerdo, queda guardado como ' + registro.code + ' sin nombre. ¿Quieres hacer otro análisis?')
+        .then(function () { state.question = 'ANOTHER'; finishTurn('idle'); });
     }
 
     // «sí» a secas: se pregunta el nombre y se espera la siguiente respuesta
-    if (intent === 'CONFIRM' && normal.length < 12) {
+    if (TAI.AIEngine.detectYesNo(texto) === 'AFFIRMATIVE' && texto.trim().length < 14) {
       state.awaitingName = true;
       state.pendingName = registro;
       return say('¿Qué nombre quieres ponerle?');
@@ -6988,7 +7121,8 @@ TAI.getSymbol = function (code) {
     var nombre = TAI.AIEngine.extractRecordName(texto) || texto.trim();
     Journal.rename(registro.id, nombre);
     refrescarHistorial();
-    return say('Listo: ' + registro.code + ' queda guardado como ' + nombre + '.');
+    return say('Listo: ' + registro.code + ' queda guardado como ' + nombre + '. ¿Quieres hacer otro análisis?')
+      .then(function () { state.question = 'ANOTHER'; finishTurn('idle'); });
   }
 
   /** Consultas y gestión del historial por voz. Nada se calcula fuera de lo registrado. */
@@ -7000,6 +7134,7 @@ TAI.getSymbol = function (code) {
       var r = Journal.get(id);
       if (!r) return say('No encontré la operación número ' + id + '.');
       state.pendingDelete = id;
+      state.question = 'DELETE';
       return say('¿Confirmas que quieres eliminar la operación número ' + id + '?');
     }
 
