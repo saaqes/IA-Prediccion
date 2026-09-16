@@ -1607,7 +1607,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.6.1';
+TAI.VERSION = '2.7.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -3872,6 +3872,13 @@ TAI.getSymbol = function (code) {
     } catch (e) { return null; }
   }
 
+  function sesionGet(clave) {
+    try { return sessionStorage.getItem(clave); } catch (e) { return null; }
+  }
+  function sesionSet(clave, valor) {
+    try { sessionStorage.setItem(clave, valor); return true; } catch (e) { return false; }
+  }
+
   var Store = {
     get: function (clave) {
       try {
@@ -3882,21 +3889,35 @@ TAI.getSymbol = function (code) {
       var c = leerCookie(clave);
       if (c != null) return c;
 
+      var s = sesionGet(clave);
+      if (s != null) return s;
+
       return memoria[clave] != null ? memoria[clave] : null;
     },
 
     set: function (clave, valor) {
       memoria[clave] = valor;                 // siempre, para la sesión actual
       var ok = false;
-      try { localStorage.setItem(clave, valor); ok = true; } catch (e) { /* se prueba la cookie */ }
-      if (!ok) ok = escribirCookie(clave, valor);
-      return ok;
+      try { localStorage.setItem(clave, valor); ok = true; } catch (e) { /* se prueban los demás */ }
+      var cookieOk = escribirCookie(clave, valor);     // segundo respaldo, siempre
+      var sesionOk = sesionSet(clave, valor);          // tercero, sobrevive a recargas
+      return ok || cookieOk || sesionOk;
     },
 
     /** ¿El valor sobrevivirá a una recarga? */
     persiste: function (clave) {
       try { if (localStorage.getItem(clave) != null) return true; } catch (e) { /* noop */ }
-      return leerCookie(clave) != null;
+      if (leerCookie(clave) != null) return true;
+      return sesionGet(clave) != null;
+    },
+
+    /** Qué mecanismos de almacenamiento funcionan aquí. Útil para diagnosticar. */
+    diagnostico: function () {
+      var d = { localStorage: false, cookie: false, sessionStorage: false, origen: location.protocol };
+      try { localStorage.setItem('__t', '1'); localStorage.removeItem('__t'); d.localStorage = true; } catch (e) { /* noop */ }
+      d.cookie = escribirCookie('__t', '1') && leerCookie('__t') === '1';
+      d.sessionStorage = sesionSet('__t', '1') && sesionGet('__t') === '1';
+      return d;
     }
   };
 
@@ -4055,6 +4076,8 @@ TAI.getSymbol = function (code) {
 
     clear: function () { guardar([]); }
   };
+
+  Journal.storageInfo = function () { return Store.diagnostico(); };
 
   TAI.Journal = Journal;
 })(window.TAI);
@@ -5184,8 +5207,31 @@ TAI.getSymbol = function (code) {
 
   /* ---------------------- pantalla de primer ingreso ---------------------- */
 
-  function showNameScreen() {
+  /**
+   * Muestra la pantalla de nombre. Se niega a mostrarse si ya se cerró antes
+   * en esta sesión: ningún flujo posterior puede reabrirla por accidente.
+   */
+  var nameScreenUsada = false;
+
+  function showNameScreen(sinPersistencia) {
     if (!el.nameScreen) return;
+
+    if (nameScreenUsada) {
+      console.warn('[iris] se intentó reabrir la pantalla de nombre: ignorado');
+      return;
+    }
+    nameScreenUsada = true;
+
+    if (sinPersistencia) {
+      var aviso = el.nameScreen.querySelector('.boot__status');
+      if (!aviso) {
+        aviso = document.createElement('p');
+        aviso.className = 'boot__status';
+        el.nameScreen.querySelector('.boot__inner').appendChild(aviso);
+      }
+      aviso.textContent = 'Este navegador no permite guardar datos. Abre la página por https para que recuerde tu nombre.';
+    }
+
     el.nameScreen.hidden = false;
     setTimeout(function () { el.nameInput && el.nameInput.focus(); }, 300);
   }
@@ -5573,7 +5619,20 @@ TAI.getSymbol = function (code) {
   var Journal = TAI.Journal;
   var Market = TAI.MarketAPI;      // proveedor activo; se puede cambiar en caliente
 
+  /**
+   * Estados del arranque. La pantalla de nombre SOLO puede existir en
+   * NAME_ONBOARDING, y a ese estado únicamente se entra desde INITIALIZING.
+   */
+  var FASES = {
+    INITIALIZING: 'INITIALIZING',
+    NAME_ONBOARDING: 'NAME_ONBOARDING',
+    GREETING: 'GREETING',
+    LISTENING: 'LISTENING',
+    READY: 'READY'
+  };
+
   var state = {
+    phase: FASES.INITIALIZING,
     symbol: CFG.MARKET.defaultSymbol,
     busy: false,
     lastAnalysis: null,
@@ -5589,6 +5648,7 @@ TAI.getSymbol = function (code) {
     bootFailSafe: null,
     introAnswered: false,
     onboardingShown: false,
+    onboardingDone: false,
     nameVolatile: false,
     userName: '',
     entryPrice: null,
@@ -5666,7 +5726,17 @@ TAI.getSymbol = function (code) {
    */
   function bootSequence() {
     document.body.classList.add('is-booting');
+
+    // 1. Se leen PRIMERO los datos persistentes, antes de decidir qué mostrar
     state.userName = Journal.getName();
+    state.onboardingDone = Journal.hasOnboarded();
+    state.phase = FASES.INITIALIZING;
+
+    console.info('[iris] arranque:', {
+      nombreGuardado: state.userName || '(ninguno)',
+      onboardingCompletado: state.onboardingDone,
+      almacenamiento: Journal.storageInfo()
+    });
     UI.bootProgress(15, 'Iniciando sistemas…');
 
     // Pase lo que pase, la pantalla de inicio se retira: nunca deja la app bloqueada
@@ -5730,15 +5800,22 @@ TAI.getSymbol = function (code) {
    * onboarding no se ha completado. Se comprueba una sola vez por sesión.
    */
   function necesitaOnboarding() {
-    if (state.onboardingShown) return false;          // ya se mostró en esta sesión
-    return !state.userName && !Journal.hasOnboarded();
+    // Los datos persistentes mandan sobre cualquier estado temporal
+    if (state.userName) return false;
+    if (state.onboardingDone) return false;
+    if (state.onboardingShown) return false;
+    if (state.phase !== FASES.INITIALIZING) return false;   // jamás después del saludo
+    return true;
   }
 
   /** Pantalla de primer ingreso. Resuelve cuando el usuario acepta su nombre. */
   function pedirNombre() {
-    if (state.onboardingShown) return hablarSaludo();  // nunca dos veces
+    if (state.onboardingShown || state.phase !== FASES.INITIALIZING) {
+      return hablarSaludo();                            // nunca dos veces, nunca fuera de fase
+    }
+    state.phase = FASES.NAME_ONBOARDING;
     state.onboardingShown = true;
-    UI.showNameScreen();
+    UI.showNameScreen(!Journal.storageInfo().localStorage && !Journal.storageInfo().cookie);
 
     return new Promise(function (resolve) {
       function aceptar() {
@@ -5747,7 +5824,9 @@ TAI.getSymbol = function (code) {
 
         Journal.setName(nombre);                      // guarda nombre + onboarding hecho
         state.userName = nombre;
+        state.onboardingDone = true;
         state.onboardingShown = true;
+        state.phase = FASES.GREETING;                 // salida definitiva del onboarding
         if (UI.el.nameEdit) UI.el.nameEdit.value = nombre;
 
         // Si el navegador no deja persistir (Safari privado), se avisa pero NO se repregunta
@@ -5771,8 +5850,9 @@ TAI.getSymbol = function (code) {
   function hablarSaludo() {
     if (state.greeted) return Promise.resolve();
     state.greeted = true;
+    state.phase = FASES.GREETING;
 
-    var conocido = state.userName && Journal.hasOnboarded() && !state.onboardingShown;
+    var conocido = state.userName && state.onboardingDone && !state.onboardingShown;
     var texto;
 
     if (state.userName && conocido) {
@@ -5840,6 +5920,7 @@ TAI.getSymbol = function (code) {
    * la palabra de activación, se abre una ventana de comando.
    */
   function escucharRespuesta() {
+    state.phase = FASES.LISTENING;
     UI.bootOrbState('listening');
     UI.bootProgress(100, 'Escuchando… dime qué quieres analizar');
     UI.setIrisAvatar('listening');
@@ -5919,6 +6000,7 @@ TAI.getSymbol = function (code) {
 
   /** Transición suave hacia la interfaz principal. IRIS queda en espera. */
   function entrarAlPanel() {
+    state.phase = FASES.READY;
     UI.hideBoot();
     UI.setStatus('iris', state.wakeOn ? 'waiting' : 'off');
     UI.setIrisAvatar('idle');
@@ -6049,6 +6131,7 @@ TAI.getSymbol = function (code) {
       Journal.setName(nombre);
       state.userName = nombre;
       state.onboardingShown = true;          // el cambio manual no reabre el onboarding
+      state.onboardingDone = true;
       UI.toast(Journal.namePersists()
         ? 'Te llamaré ' + nombre + '.'
         : 'Te llamaré ' + nombre + ', pero este navegador no permite guardarlo al cerrar.');
