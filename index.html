@@ -1189,6 +1189,27 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
   .mic svg { width: 25px; height: 25px; }
 }
 
+/* --------------------------- diagnóstico de voz --------------------------- */
+
+.voice-debug {
+  position: fixed;
+  top: calc(var(--safe-top) + 8px);
+  right: 8px;
+  z-index: 90;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(139, 107, 255, 0.4);
+  background: rgba(5, 8, 15, 0.92);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  line-height: 1.5;
+  max-width: 62vw;
+  white-space: pre-wrap;
+  pointer-events: none;
+}
+
 /* -------------------------------- toast -------------------------------- */
 
 .toast {
@@ -1594,6 +1615,9 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 
   <div class="toast" id="toast" role="alert" hidden></div>
 
+  <!-- Panel de diagnóstico de voz: ?debug=1 o cinco toques en el logo -->
+  <pre class="voice-debug" id="voiceDebug" hidden aria-hidden="true"></pre>
+
   <!-- Librería oficial de gráficos de TradingView (Lightweight Charts) -->
   <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 
@@ -1607,7 +1631,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.9.0';
+TAI.VERSION = '3.0.0';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -3250,6 +3274,12 @@ TAI.getSymbol = function (code) {
     this._unlocked = false;
     this.audioCtx = null;
     this._keepAlive = null;
+    this.isRunning = false;        // recognition realmente activo
+    this.isStarting = false;       // start() en curso: no volver a llamarlo
+    this.shouldListen = false;     // la app quiere escuchar
+    this.lastTranscript = '';
+    this._restartTimer = null;
+    this._restartCount = 0;
     this._init();
   }
 
@@ -3280,6 +3310,9 @@ TAI.getSymbol = function (code) {
 
     rec.onstart = function () {
       self.listening = true;
+      self.isRunning = true;
+      self.isStarting = false;
+      self._restartCount = 0;        // arrancó bien: se reinicia el contador
       self._finalText = '';
       self.emit('start');
     };
@@ -3296,14 +3329,28 @@ TAI.getSymbol = function (code) {
         else interim += res[0].transcript;
       }
 
-      if (interim) self.emit('interim', { text: interim.trim() });
+      if (interim) { self.lastTranscript = interim.trim(); self.emit('interim', { text: interim.trim() }); }
       if (finalText.trim()) {
+        self.lastTranscript = finalText.trim();
         self.emit('interim', { text: finalText.trim() });
         self.emit('final', { text: finalText.trim() });
       }
     };
 
     rec.onerror = function (event) {
+      self.isStarting = false;
+
+      // Recuperables: no se avisa al usuario, se reintenta solo
+      if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'network') {
+        if (self.shouldListen && !self.speaking) self._scheduleRestart();
+        if (event.error !== 'network') return;
+      }
+
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        self.shouldListen = false;
+        self.permissionGranted = false;
+      }
+
       var map = {
         'not-allowed': 'No puedo acceder al micrófono. Revisa los permisos del navegador.',
         'service-not-allowed': 'No puedo acceder al micrófono. Revisa los permisos del navegador.',
@@ -3319,8 +3366,13 @@ TAI.getSymbol = function (code) {
 
     rec.onend = function () {
       self.listening = false;
+      self.isRunning = false;
+      self.isStarting = false;
       self._finalText = '';
       self.emit('end');
+
+      // Los navegadores móviles cortan la sesión solos: se recupera si toca escuchar
+      if (self.shouldListen && !self.speaking) self._scheduleRestart();
     };
 
     this.recognition = rec;
@@ -3402,7 +3454,7 @@ TAI.getSymbol = function (code) {
       this.emit('error', { message: 'El reconocimiento de voz no está disponible en este navegador.', code: 'unsupported' });
       return false;
     }
-    if (this.listening) return true;
+    if (this.isRunning || this.isStarting) return true;     // nunca dos start() seguidos
 
     // Primera vez: se pide permiso y se arranca cuando el usuario lo concede
     if (!this.permissionGranted && (!options || !options.skipPermission)) {
@@ -3413,26 +3465,57 @@ TAI.getSymbol = function (code) {
     }
 
     this.muted = false;
+    this.shouldListen = true;
     if (!options || !options.keepSpeech) this.cancelSpeech();
+
     try {
+      this.isStarting = true;
       this.recognition.lang = APP.lang;
       this.recognition.start();
       return true;
     } catch (err) {
-      // start() lanza si la sesión anterior sigue viva: se reintenta en breve
-      var self2 = this;
-      setTimeout(function () {
-        if (!self2.listening) {
-          try { self2.recognition.start(); } catch (e2) { /* noop */ }
-        }
-      }, 400);
+      // InvalidStateError: la sesión anterior sigue viva. Se reintenta en silencio.
+      this.isStarting = false;
+      this._scheduleRestart();
       return true;
     }
   };
 
-  Voice.prototype.stopListening = function () {
-    if (!this.supported || !this.listening) return;
+  /** Reinicio controlado, con espera creciente y tope para no entrar en bucle. */
+  Voice.prototype._scheduleRestart = function () {
+    var self = this;
+    if (this._restartTimer || this.isRunning || this.isStarting) return;
+
+    this._restartCount++;
+    if (this._restartCount > 12) {
+      console.warn('[Voice] demasiados reinicios seguidos, se detiene la recuperación');
+      this.emit('error', { message: 'El reconocimiento de voz se detuvo. Pulsa el micrófono para reactivarlo.', code: 'restart-limit' });
+      this.shouldListen = false;
+      this._restartCount = 0;
+      return;
+    }
+
+    var espera = Math.min(250 * this._restartCount, 2000);
+    this._restartTimer = setTimeout(function () {
+      self._restartTimer = null;
+      if (self.shouldListen && !self.speaking && !self.isRunning) {
+        self.startListening({ skipPermission: self.permissionGranted, keepSpeech: true });
+      }
+    }, espera);
+  };
+
+  Voice.prototype.stopListening = function (opciones) {
+    if (!opciones || !opciones.keepIntent) this.shouldListen = false;
+    if (this._restartTimer) { clearTimeout(this._restartTimer); this._restartTimer = null; }
+    if (!this.supported || !this.isRunning) return;
     try { this.recognition.stop(); } catch (e) { /* noop */ }
+  };
+
+  /** Corta el reconocimiento de inmediato (para que IRIS no se oiga a sí misma). */
+  Voice.prototype.pauseForSpeech = function () {
+    if (this._restartTimer) { clearTimeout(this._restartTimer); this._restartTimer = null; }
+    if (!this.supported || !this.isRunning) return;
+    try { this.recognition.abort(); } catch (e) { /* noop */ }
   };
 
   /* ------------------------------ síntesis de voz ------------------------------ */
@@ -3537,6 +3620,11 @@ TAI.getSymbol = function (code) {
     var token = ++this._speakToken;
     var voice = this._pickVoice();
 
+    // Se corta el micrófono ANTES de hablar: es lo único que evita el eco de verdad
+    var retomar = this.shouldListen;
+    this.muted = true;
+    this.pauseForSpeech();
+
     // Posición de cada frase dentro del texto completo, para los índices de palabra
     var offsets = [];
     var cursor = 0;
@@ -3562,7 +3650,15 @@ TAI.getSymbol = function (code) {
         if (token === self._speakToken) {
           self.speaking = false;
           self._stopKeepAlive();
+          self.muted = false;
+          self._ignoreUntil = Date.now() + 300;
           self.emit('speakend');
+
+          // Se retoma la escucha solo si la aplicación la quería antes de hablar
+          if (retomar) {
+            self.shouldListen = true;
+            self._scheduleRestart();
+          }
         }
         resolve();
       }
@@ -3747,7 +3843,7 @@ TAI.getSymbol = function (code) {
   };
 
   // Variantes que suele devolver el reconocimiento para «Iris»
-  var WAKE_PATTERN = /\b(iris|irís|iri|irix|iriz|hiris|iribs|aires|irs)\b/;
+  var WAKE_PATTERN = /(^|\s)(iris|iriss|iri|irix|iriz|irs|hiris|ibis|airis|yris|eris|aires|isis)(?=\s|$)/;
 
   function normalize(text) {
     return (text || '')
@@ -3818,7 +3914,10 @@ TAI.getSymbol = function (code) {
       this.setState(STATES.WAKE_WORD_DETECTED);
       this.emit('activated', { transcript: texto });
 
-      if (resto.length >= 3) {
+      // «Iris, sí» o «Iris, no» son órdenes completas, aunque sean cortas
+      var esRespuesta = TAI.AIEngine && TAI.AIEngine.detectYesNo && TAI.AIEngine.detectYesNo(resto);
+
+      if (resto.length >= 3 || esRespuesta) {
         this.clearCommandTimer();
         this.setState(STATES.PROCESSING);
         return { action: 'command', command: resto, wakeWord: 'iris' };
@@ -4924,7 +5023,7 @@ TAI.getSymbol = function (code) {
       'analysisPanel', 'resMarket', 'resDirection', 'resConfidence', 'resConfidenceBar',
       'resTicks', 'resDuration', 'resTrend', 'resMomentum', 'resVolatility', 'resReason',
       'countdownCard', 'countdownValue', 'countdownRing', 'cdMarket', 'cdDirection', 'cdTicks', 'cdState',
-      'toast', 'confirmPanel', 'confirmDetails', 'confirmAccept', 'confirmCancel',
+      'toast', 'voiceDebug', 'confirmPanel', 'confirmDetails', 'confirmAccept', 'confirmCancel',
       'textInput', 'sendBtn', 'talkAgainBtn',
       'configPanel', 'configQuestion', 'cfgMarket', 'cfgTicks', 'cfgWindow',
       'useRecBtn', 'changeCfgBtn', 'againBtn'
@@ -5548,6 +5647,13 @@ TAI.getSymbol = function (code) {
 
   function hideCountdown() { closePanel(el.countdownCard); }
 
+  /** Panel de diagnóstico, solo para desarrollo. */
+  function setDebug(texto) {
+    if (!el.voiceDebug) return;
+    el.voiceDebug.hidden = !texto;
+    if (texto) el.voiceDebug.textContent = texto;
+  }
+
   var toastTimer = null;
   function toast(message) {
     if (!el.toast || !message) return;
@@ -5670,6 +5776,7 @@ TAI.getSymbol = function (code) {
     finishCountdown: finishCountdown,
     hideCountdown: hideCountdown,
     toast: toast,
+    setDebug: setDebug,
     showConfig: showConfig,
     updateConfigTicks: updateConfigTicks,
     hideConfig: hideConfig,
@@ -5804,6 +5911,7 @@ TAI.getSymbol = function (code) {
     UI.mountTradingViewWidget();
 
     refrescarHistorial();
+    prepararDebug();
 
     bindUI();
     bindVoice();
@@ -6115,6 +6223,38 @@ TAI.getSymbol = function (code) {
     resumeListening();
   }
 
+  /**
+   * Diagnóstico de voz para pruebas en el teléfono.
+   * Se activa con ?debug=1 o tocando cinco veces el nombre de la aplicación.
+   */
+  function prepararDebug() {
+    var activo = /[?&]debug=1/.test(location.search);
+    var toques = 0;
+
+    var marca = document.querySelector('.brand__name');
+    if (marca) {
+      marca.addEventListener('click', function () {
+        toques++;
+        if (toques >= 5) { activo = !activo; toques = 0; if (!activo) UI.setDebug(''); }
+      });
+    }
+
+    setInterval(function () {
+      if (!activo) return;
+      UI.setDebug(
+        'VOICE STATE:      ' + (Voice.speaking ? 'SPEAKING' : Voice.isRunning ? 'LISTENING' : 'IDLE') + '\n' +
+        'RECOGNITION:      ' + (Voice.isRunning ? 'RUNNING' : Voice.isStarting ? 'STARTING' : 'STOPPED') +
+          ' (quiere: ' + (Voice.shouldListen ? 'sí' : 'no') + ')\n' +
+        'WAKE WORD:        ' + (state.wakeOn ? Wake.state : 'OFF') + '\n' +
+        'LAST TRANSCRIPT:  ' + (Voice.lastTranscript || '—') + '\n' +
+        'CONV STATE:       ' + state.conv + '\n' +
+        'PENDING QUESTION: ' + (state.question || 'null') + '\n' +
+        'MERCADO:          ' + state.symbol + ' · ticks ' + (state.ticks || '—') + '\n' +
+        'USUARIO:          ' + (state.userName || '—')
+      );
+    }, 500);
+  }
+
   /* ------------------------------- interfaz ------------------------------- */
 
   function bindUI() {
@@ -6289,7 +6429,7 @@ TAI.getSymbol = function (code) {
       UI.setStatus('voice', 'ready');
       if (state.busy) return;
 
-      if (state.wakeOn && !state.micOpen) { resumeListening(); return; }
+      if (!state.micOpen && debeEscuchar()) { resumeListening(); return; }
 
       if (state.micOpen) {
         state.silenceStreak++;
@@ -6401,15 +6541,25 @@ TAI.getSymbol = function (code) {
   }
 
   /** Reabre el micrófono si la conversación sigue activa. */
+  /** ¿IRIS debe estar escuchando ahora mismo? */
+  function debeEscuchar() {
+    if (!Voice.supported) return false;
+    if (Voice.speaking) return false;
+    if (state.micOpen) return true;                 // micrófono abierto a mano
+    if (state.question) return true;                // hay una pregunta esperando respuesta
+    if (state.awaitingName) return true;
+    if (state.conv && state.conv.indexOf('WAITING') === 0) return true;
+    return state.wakeOn;                            // en espera de la palabra «Iris»
+  }
+
   function resumeListening() {
-    if (!Voice.supported) return;
-    if (!state.micOpen && !state.wakeOn) return;
-    if (Voice.listening || Voice.speaking) return;
+    if (!debeEscuchar()) return;
+    if (Voice.isRunning || Voice.isStarting) return;
     setTimeout(function () {
-      if ((state.micOpen || state.wakeOn) && !Voice.listening && !Voice.speaking) {
-        Voice.startListening({ skipPermission: Voice.permissionGranted });
+      if (debeEscuchar() && !Voice.isRunning && !Voice.isStarting) {
+        Voice.startListening({ skipPermission: Voice.permissionGranted, keepSpeech: true });
       }
-    }, 400);
+    }, 350);
   }
 
   function closeMic() {
