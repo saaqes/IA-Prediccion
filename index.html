@@ -1607,7 +1607,7 @@ table.watch tr[data-active="true"] td:first-child { box-shadow: inset 2px 0 0 va
 window.TAI = window.TAI || {};
 
 /** Versión visible en pantalla y en consola, para saber qué build se está ejecutando. */
-TAI.VERSION = '2.6.0';
+TAI.VERSION = '2.6.1';
 
 TAI.CONFIG = {
   /* ------------------------------------------------------------------ */
@@ -3844,11 +3844,65 @@ TAI.getSymbol = function (code) {
   'use strict';
 
   var CLAVE = 'tai.journal.v1';
-  var CLAVE_NOMBRE = 'tai.user.name';
+  var CLAVE_NOMBRE = 'iris_user_name';
+  var CLAVE_ONBOARDING = 'iris_onboarding_done';
+  var CLAVE_NOMBRE_VIEJA = 'tai.user.name';   // versiones anteriores
+
+  /* ------------------------------------------------------------------ */
+  /* Almacenamiento con respaldo                                         */
+  /* Safari en navegación privada lanza al escribir en localStorage.     */
+  /* Si falla, se usa una cookie y, en último caso, memoria de sesión.   */
+  /* ------------------------------------------------------------------ */
+
+  var memoria = {};
+
+  function escribirCookie(clave, valor) {
+    try {
+      var caduca = new Date(Date.now() + 365 * 864e5).toUTCString();
+      document.cookie = encodeURIComponent(clave) + '=' + encodeURIComponent(valor) +
+        ';expires=' + caduca + ';path=/;SameSite=Lax';
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function leerCookie(clave) {
+    try {
+      var m = document.cookie.match('(?:^|; )' + encodeURIComponent(clave).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)');
+      return m ? decodeURIComponent(m[1]) : null;
+    } catch (e) { return null; }
+  }
+
+  var Store = {
+    get: function (clave) {
+      try {
+        var v = localStorage.getItem(clave);
+        if (v != null) return v;
+      } catch (e) { /* almacenamiento bloqueado */ }
+
+      var c = leerCookie(clave);
+      if (c != null) return c;
+
+      return memoria[clave] != null ? memoria[clave] : null;
+    },
+
+    set: function (clave, valor) {
+      memoria[clave] = valor;                 // siempre, para la sesión actual
+      var ok = false;
+      try { localStorage.setItem(clave, valor); ok = true; } catch (e) { /* se prueba la cookie */ }
+      if (!ok) ok = escribirCookie(clave, valor);
+      return ok;
+    },
+
+    /** ¿El valor sobrevivirá a una recarga? */
+    persiste: function (clave) {
+      try { if (localStorage.getItem(clave) != null) return true; } catch (e) { /* noop */ }
+      return leerCookie(clave) != null;
+    }
+  };
 
   function leer() {
     try {
-      var raw = localStorage.getItem(CLAVE);
+      var raw = Store.get(CLAVE);
       var datos = raw ? JSON.parse(raw) : [];
       return Array.isArray(datos) ? datos : [];
     } catch (e) {
@@ -3858,13 +3912,7 @@ TAI.getSymbol = function (code) {
   }
 
   function guardar(lista) {
-    try {
-      localStorage.setItem(CLAVE, JSON.stringify(lista));
-      return true;
-    } catch (e) {
-      console.warn('[journal] no se pudo guardar:', e && e.message);
-      return false;
-    }
+    return Store.set(CLAVE, JSON.stringify(lista));
   }
 
   function siguienteId(lista) {
@@ -3876,11 +3924,32 @@ TAI.getSymbol = function (code) {
   var Journal = {
     /** Nombre con el que IRIS se dirige al usuario. */
     getName: function () {
-      try { return localStorage.getItem(CLAVE_NOMBRE) || ''; } catch (e) { return ''; }
+      var n = Store.get(CLAVE_NOMBRE);
+      if (n) return n;
+
+      // Migración desde la clave anterior
+      var viejo = Store.get(CLAVE_NOMBRE_VIEJA);
+      if (viejo) { Store.set(CLAVE_NOMBRE, viejo); return viejo; }
+
+      return '';
     },
+
     setName: function (nombre) {
-      try { localStorage.setItem(CLAVE_NOMBRE, String(nombre || '').trim()); return true; }
-      catch (e) { return false; }
+      var limpio = String(nombre || '').trim();
+      if (!limpio) return false;
+      var ok = Store.set(CLAVE_NOMBRE, limpio);
+      Store.set(CLAVE_ONBOARDING, '1');
+      return ok;
+    },
+
+    /** true cuando el usuario ya pasó por la pantalla de nombre. */
+    hasOnboarded: function () {
+      return Store.get(CLAVE_ONBOARDING) === '1' || !!Store.get(CLAVE_NOMBRE);
+    },
+
+    /** ¿El nombre sobrevivirá a una recarga? Sirve para avisar, no para repreguntar. */
+    namePersists: function () {
+      return Store.persiste(CLAVE_NOMBRE);
     },
 
     list: function () {
@@ -5519,6 +5588,8 @@ TAI.getSymbol = function (code) {
     bootTimer: null,
     bootFailSafe: null,
     introAnswered: false,
+    onboardingShown: false,
+    nameVolatile: false,
     userName: '',
     entryPrice: null,
     awaitingName: false,
@@ -5645,8 +5716,8 @@ TAI.getSymbol = function (code) {
       UI.bootProgress(100, 'IRIS lista');
       return new Promise(function (r) { setTimeout(r, 450); });
     }).then(function () {
-      // Primera visita: se pregunta el nombre antes de que IRIS salude
-      if (!state.userName) return pedirNombre();
+      // ÚNICO punto del flujo que puede abrir el onboarding
+      if (necesitaOnboarding()) return pedirNombre();
       return hablarSaludo();
     }).catch(function (err) {
       console.error('[app] fallo en el arranque:', err);
@@ -5654,8 +5725,19 @@ TAI.getSymbol = function (code) {
     });
   }
 
+  /**
+   * Única condición para pedir el nombre: no hay nombre guardado y el
+   * onboarding no se ha completado. Se comprueba una sola vez por sesión.
+   */
+  function necesitaOnboarding() {
+    if (state.onboardingShown) return false;          // ya se mostró en esta sesión
+    return !state.userName && !Journal.hasOnboarded();
+  }
+
   /** Pantalla de primer ingreso. Resuelve cuando el usuario acepta su nombre. */
   function pedirNombre() {
+    if (state.onboardingShown) return hablarSaludo();  // nunca dos veces
+    state.onboardingShown = true;
     UI.showNameScreen();
 
     return new Promise(function (resolve) {
@@ -5663,9 +5745,17 @@ TAI.getSymbol = function (code) {
         var nombre = (UI.el.nameInput.value || '').trim();
         if (!nombre) { UI.el.nameInput.focus(); return; }
 
-        Journal.setName(nombre);
+        Journal.setName(nombre);                      // guarda nombre + onboarding hecho
         state.userName = nombre;
+        state.onboardingShown = true;
         if (UI.el.nameEdit) UI.el.nameEdit.value = nombre;
+
+        // Si el navegador no deja persistir (Safari privado), se avisa pero NO se repregunta
+        if (!Journal.namePersists()) {
+          console.warn('[app] el nombre no se pudo guardar de forma persistente');
+          state.nameVolatile = true;
+        }
+
         UI.hideNameScreen();
         setTimeout(function () { resolve(hablarSaludo()); }, 320);
       }
@@ -5682,9 +5772,18 @@ TAI.getSymbol = function (code) {
     if (state.greeted) return Promise.resolve();
     state.greeted = true;
 
-    var texto = state.userName
-      ? 'Hola ' + state.userName + ', soy Iris. ¿Qué vamos a hacer hoy? ¿Quieres operar o prefieres que espere a que me indiques un análisis?'
-      : CFG.APP.greeting;
+    var conocido = state.userName && Journal.hasOnboarded() && !state.onboardingShown;
+    var texto;
+
+    if (state.userName && conocido) {
+      texto = 'Hola ' + state.userName + ', soy Iris. Qué bueno tenerte de nuevo. ¿Qué vamos a hacer hoy? ' +
+              '¿Quieres operar o prefieres que espere a que me indiques un análisis?';
+    } else if (state.userName) {
+      texto = 'Hola ' + state.userName + ', soy Iris. ¿Qué vamos a hacer hoy? ' +
+              '¿Quieres operar o prefieres que espere a que me indiques un análisis?';
+    } else {
+      texto = CFG.APP.greeting;
+    }
 
     UI.addMessage('ai', texto);
     state.conversation.push({ role: 'assistant', content: texto });
@@ -5945,10 +6044,14 @@ TAI.getSymbol = function (code) {
 
     UI.el.nameEdit.addEventListener('change', function (e) {
       var nombre = (e.target.value || '').trim();
-      if (!nombre) return;
+      if (!nombre) { e.target.value = state.userName || ''; return; }
+
       Journal.setName(nombre);
       state.userName = nombre;
-      UI.toast('Te llamaré ' + nombre + '.');
+      state.onboardingShown = true;          // el cambio manual no reabre el onboarding
+      UI.toast(Journal.namePersists()
+        ? 'Te llamaré ' + nombre + '.'
+        : 'Te llamaré ' + nombre + ', pero este navegador no permite guardarlo al cerrar.');
     });
 
     UI.el.reconnectBtn.addEventListener('click', function () {
